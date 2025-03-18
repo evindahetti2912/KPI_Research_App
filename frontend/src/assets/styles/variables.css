@@ -1,0 +1,187 @@
+/* CSS Variables for KPI Allocation Application */
+
+:root {
+    /* Color palette */
+    --primary-color: #3B82F6;
+    /* Blue 500 */
+    --primary-light: #93C5FD;
+    /* Blue 300 */
+    --primary-dark: #1E40AF;
+    /* Blue 800 */
+
+    --secondary-color: #10B981;
+    /* Green 500 */
+    --secondary-light: #6EE7B7;
+    /* Green 300 */
+    --secondary-dark: #065F46;
+    /* Green 800 */
+
+    --tertiary-color: #8B5CF6;
+    /* Violet 500 */
+    --tertiary-light: #C4B5FD;
+    /* Violet 300 */
+    --tertiary-dark: #5B21B6;
+    /* Violet 800 */
+
+    --accent-color: #F59E0B;
+    /* Amber 500 */
+    --accent-light: #FCD34D;
+    /* Amber 300 */
+    --accent-dark: #92400E;
+    /* Amber 800 */
+
+    --danger-color: #EF4444;
+    /* Red 500 */
+    --danger-light: #FCA5A5;
+    /* Red 300 */
+    --danger-dark: #991B1B;
+    /* Red 800 */
+
+    --gray-50: #F9FAFB;
+    --gray-100: #F3F4F6;
+    --gray-200: #E5E7EB;
+    --gray-300: #D1D5DB;
+    --gray-400: #9CA3AF;
+    --gray-500: #6B7280;
+    --gray-600: #4B5563;
+    --gray-700: #374151;
+    --gray-800: #1F2937;
+    --gray-900: #111827;
+
+    /* Text colors */
+    --text-primary: var(--gray-900);
+    --text-secondary: var(--gray-700);
+    --text-tertiary: var(--gray-500);
+    --text-light: var(--gray-50);
+
+    /* Background colors */
+    --bg-light: var(--gray-50);
+    --bg-page: var(--gray-100);
+    --bg-card: #FFFFFF;
+    --bg-card-hover: var(--gray-50);
+
+    /* Status colors */
+    --status-on-track: var(--secondary-color);
+    --status-at-risk: var(--accent-color);
+    --status-below-target: var(--danger-color);
+
+    /* Skill category colors */
+    --skill-programming: var(--primary-color);
+    --skill-framework: var(--secondary-color);
+    --skill-database: var(--tertiary-color);
+    --skill-other: var(--gray-500);
+
+    /* Border colors */
+    --border-light: var(--gray-200);
+    --border-medium: var(--gray-300);
+    --border-dark: var(--gray-400);
+
+    /* Shadow values */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+    /* Spacing values */
+    --spacing-1: 0.25rem;
+    /* 4px */
+    --spacing-2: 0.5rem;
+    /* 8px */
+    --spacing-3: 0.75rem;
+    /* 12px */
+    --spacing-4: 1rem;
+    /* 16px */
+    --spacing-5: 1.25rem;
+    /* 20px */
+    --spacing-6: 1.5rem;
+    /* 24px */
+    --spacing-8: 2rem;
+    /* 32px */
+    --spacing-10: 2.5rem;
+    /* 40px */
+    --spacing-12: 3rem;
+    /* 48px */
+    --spacing-16: 4rem;
+    /* 64px */
+    --spacing-20: 5rem;
+    /* 80px */
+    --spacing-24: 6rem;
+    /* 96px */
+
+    /* Border radius */
+    --radius-sm: 0.125rem;
+    /* 2px */
+    --radius-md: 0.25rem;
+    /* 4px */
+    --radius-lg: 0.5rem;
+    /* 8px */
+    --radius-xl: 0.75rem;
+    /* 12px */
+    --radius-2xl: 1rem;
+    /* 16px */
+    --radius-full: 9999px;
+
+    /* Font sizes */
+    --text-xs: 0.75rem;
+    /* 12px */
+    --text-sm: 0.875rem;
+    /* 14px */
+    --text-base: 1rem;
+    /* 16px */
+    --text-lg: 1.125rem;
+    /* 18px */
+    --text-xl: 1.25rem;
+    /* 20px */
+    --text-2xl: 1.5rem;
+    /* 24px */
+    --text-3xl: 1.875rem;
+    /* 30px */
+    --text-4xl: 2.25rem;
+    /* 36px */
+
+    /* Font weights */
+    --font-thin: 100;
+    --font-extralight: 200;
+    --font-light: 300;
+    --font-normal: 400;
+    --font-medium: 500;
+    --font-semibold: 600;
+    --font-bold: 700;
+    --font-extrabold: 800;
+    --font-black: 900;
+
+    /* Line heights */
+    --leading-none: 1;
+    --leading-tight: 1.25;
+    --leading-snug: 1.375;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.625;
+    --leading-loose: 2;
+
+    /* Animation durations */
+    --duration-75: 75ms;
+    --duration-100: 100ms;
+    --duration-150: 150ms;
+    --duration-200: 200ms;
+    --duration-300: 300ms;
+    --duration-500: 500ms;
+    --duration-700: 700ms;
+    --duration-1000: 1000ms;
+
+    /* Z-index values */
+    --z-0: 0;
+    --z-10: 10;
+    --z-20: 20;
+    --z-30: 30;
+    --z-40: 40;
+    --z-50: 50;
+    --z-modal: 100;
+    --z-tooltip: 110;
+
+    /* Container widths */
+    --container-sm: 640px;
+    --container-md: 768px;
+    --container-lg: 1024px;
+    --container-xl: 1280px;
+    --container-2xl: 1536px;
+}

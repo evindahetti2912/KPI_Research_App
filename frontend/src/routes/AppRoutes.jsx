@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 
 // Layout components
@@ -16,17 +17,29 @@ import CVUploadPage from "../pages/CVUploadPage";
 import TalentPoolPage from "../pages/TalentPoolPage";
 import KPIManagementPage from "../pages/KPIManagementPage";
 import SkillDevelopmentPage from "../pages/SkillDevelopmentPage";
-
-// Authentication
 import LoginPage from "../pages/LoginPage";
+import NotFoundPage from "../pages/NotFoundPage";
+
+// Auth context
 import { useAuth } from "../contexts/AuthContext";
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
 
+  // Show loading while checking authentication status
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-12 h-12 border-b-2 border-blue-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return children;
@@ -41,7 +54,9 @@ const AppRoutes = () => {
         {/* Authentication routes */}
         <Route
           path="/login"
-          element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />}
+          element={
+            isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
+          }
         />
 
         {/* Protected routes within MainLayout */}
@@ -63,12 +78,18 @@ const AppRoutes = () => {
           <Route path="talent-pool" element={<TalentPoolPage />} />
           <Route path="talent-pool/:employeeId" element={<TalentPoolPage />} />
 
-          {/* Projects routes - uses nested routing defined in ProjectsPage */}
-          <Route path="projects/*" element={<ProjectsPage />} />
+          {/* Projects */}
+          <Route path="projects" element={<ProjectsPage />} />
+          <Route path="projects/:projectId" element={<ProjectsPage />} />
+          <Route
+            path="projects/:projectId/:action"
+            element={<ProjectsPage />}
+          />
 
           {/* KPI Management */}
+          <Route path="kpi-management" element={<KPIManagementPage />} />
           <Route
-            path="projects/:projectId/kpi"
+            path="kpi-management/:projectId"
             element={<KPIManagementPage />}
           />
 
@@ -80,8 +101,8 @@ const AppRoutes = () => {
           />
         </Route>
 
-        {/* Catch all route - redirect to dashboard */}
-        <Route path="*" element={<Navigate to="/" />} />
+        {/* 404 Page */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Router>
   );

@@ -1,24 +1,24 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react';
+import { BrowserRouter as Router } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProjectProvider } from './contexts/ProjectContext';
+import { EmployeeProvider } from './contexts/EmployeeContext';
+import AppRoutes from './routes/AppRoutes';
+import './assets/styles/main.css';
 
+/**
+ * Main App component that serves as the root of the application.
+ * Sets up context providers and routing.
+ */
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <AuthProvider>
+      <ProjectProvider>
+        <EmployeeProvider>
+          <AppRoutes />
+        </EmployeeProvider>
+      </ProjectProvider>
+    </AuthProvider>
   );
 }
 
