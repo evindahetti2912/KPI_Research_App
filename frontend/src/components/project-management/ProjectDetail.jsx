@@ -65,6 +65,7 @@ const ProjectDetail = ({ projectId, onBack }) => {
         project_team_size: parseInt(editFormData.project_team_size),
         project_timeline: parseInt(editFormData.project_timeline),
         project_sprints: parseInt(editFormData.project_sprints),
+        status: editFormData.status,
       };
 
       const response = await projectService.updateProject(
@@ -73,7 +74,12 @@ const ProjectDetail = ({ projectId, onBack }) => {
       );
 
       if (response.success) {
-        setProject(updateData);
+        const refreshResponse = await projectService.getProject(projectId);
+        if (refreshResponse.success) {
+          setProject(refreshResponse.data);
+        } else {
+          setProject(updateData);
+        }
         setIsEditing(false);
       } else {
         setError(response.message || "Failed to update project");
