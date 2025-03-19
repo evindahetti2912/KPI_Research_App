@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import Card from "../common/Card";
 import Button from "../common/Button";
@@ -6,17 +6,30 @@ import Loading from "../common/Loading";
 import { projectService } from "../../services/projectService";
 import { employeeService } from "../../services/employeeService";
 
-const TeamComposition = ({ projectId }) => {
+const TeamComposition = ({ projectId, onBack }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [teamData, setTeamData] = useState(null);
   const [employeeDetails, setEmployeeDetails] = useState([]);
+
+  // Create a ref to expose refreshTeam method to parent components
+  const refreshTeamRef = useRef(null);
 
   useEffect(() => {
     if (projectId) {
       fetchTeamData();
     }
   }, [projectId]);
+
+  // Public method that can be called from parent components to refresh team data
+  const refreshTeam = async () => {
+    await fetchTeamData();
+  };
+
+  // Expose the refreshTeam method via ref
+  useEffect(() => {
+    refreshTeamRef.current = refreshTeam;
+  }, []);
 
   const fetchTeamData = async () => {
     setIsLoading(true);
@@ -38,6 +51,9 @@ const TeamComposition = ({ projectId }) => {
           response.data.employee_ids.length > 0
         ) {
           await fetchEmployeeDetails(response.data.employee_ids);
+        } else {
+          // Clear employee details if no employees assigned
+          setEmployeeDetails([]);
         }
       } else {
         setError(response.message || "Failed to fetch team data");
@@ -52,10 +68,12 @@ const TeamComposition = ({ projectId }) => {
 
   const fetchEmployeeDetails = async (employeeIds) => {
     try {
+      // Map each ID to a promise that fetches the employee details
       const employeePromises = employeeIds.map((id) =>
         employeeService.getEmployee(id)
       );
 
+      // Wait for all promises to resolve
       const employeeResponses = await Promise.all(employeePromises);
 
       // Extract employee data from successful responses
@@ -221,11 +239,36 @@ const TeamComposition = ({ projectId }) => {
                   : `Total: ${employeeDetails.length} developers`}
               </p>
             </div>
-            <Link to={`/projects/${projectId}/match`}>
-              <Button variant="outline" size="sm">
-                Update Team
+            <div className="flex space-x-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchTeamData}
+                icon={
+                  <svg
+                    className="w-4 h-4 mr-1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                }
+              >
+                Refresh
               </Button>
-            </Link>
+              <Link to={`/projects/${projectId}/match`}>
+                <Button variant="outline" size="sm">
+                  Update Team
+                </Button>
+              </Link>
+            </div>
           </div>
 
           <div className="space-y-4 divide-y">
@@ -347,9 +390,10 @@ const TeamComposition = ({ projectId }) => {
           </div>
 
           <div className="flex justify-end pt-4 border-t">
-            <Link to={`/projects/${projectId}`}>
+            {onBack ? (
               <Button
                 variant="outline"
+                onClick={onBack}
                 icon={
                   <svg
                     className="w-4 h-4 mr-1"
@@ -367,9 +411,33 @@ const TeamComposition = ({ projectId }) => {
                   </svg>
                 }
               >
-                Back to Project Details
+                Back
               </Button>
-            </Link>
+            ) : (
+              <Link to={`/projects/${projectId}`}>
+                <Button
+                  variant="outline"
+                  icon={
+                    <svg
+                      className="w-4 h-4 mr-1"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                      />
+                    </svg>
+                  }
+                >
+                  Back to Project Details
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       )}

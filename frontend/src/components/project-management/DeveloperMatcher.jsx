@@ -6,10 +6,11 @@ import { Link } from "react-router-dom";
 import { projectService } from "../../services/projectService";
 import { employeeService } from "../../services/employeeService";
 
-const DeveloperMatcher = ({ projectId, onUpdateTeam }) => {
+const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const [project, setProject] = useState(null);
   const [matchedEmployees, setMatchedEmployees] = useState([]);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
@@ -88,11 +89,12 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam }) => {
     });
   };
 
-  const assignTeam = async () => {
+  const handleAssignTeam = async () => {
     if (!project || selectedEmployees.length === 0) return;
 
     setIsLoading(true);
     setError("");
+    setSuccess(false);
 
     try {
       // Update project with selected team members
@@ -108,6 +110,14 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam }) => {
         if (onUpdateTeam) {
           onUpdateTeam(selectedEmployees);
         }
+
+        // Show success message
+        setSuccess(true);
+
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => {
+          setSuccess(false);
+        }, 3000);
 
         // Refresh project data
         fetchProjectDetails();
@@ -125,19 +135,10 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam }) => {
   // Function to render the skill match score with appropriate color
   const renderMatchScore = (score) => {
     let bgColor = "bg-red-100 text-red-800";
-    if (score >= 0.8) {
-      bgColor = "bg-green-100 text-green-800";
-    } else if (score >= 0.6) {
-      bgColor = "bg-yellow-100 text-yellow-800";
-    } else if (score >= 0.4) {
-      bgColor = "bg-orange-100 text-orange-800";
-    }
-
-    return (
-      <span className={`text-xs px-2 py-0.5 rounded ${bgColor}`}>
-        {Math.round(score * 100)}%
-      </span>
-    );
+    if (score >= 0.8) return "bg-green-100 text-green-800";
+    if (score >= 0.6) return "bg-yellow-100 text-yellow-800";
+    if (score >= 0.4) return "bg-orange-100 text-orange-800";
+    return bgColor;
   };
 
   return (
@@ -302,7 +303,13 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam }) => {
                             <span className="text-xs text-gray-500">
                               Match:
                             </span>
-                            {renderMatchScore(matchData.total_score)}
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded ${renderMatchScore(
+                                matchData.total_score
+                              )}`}
+                            >
+                              {Math.round(matchData.total_score * 100)}%
+                            </span>
                           </div>
                         </div>
 
@@ -317,33 +324,63 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam }) => {
                               <span className="text-gray-500">
                                 Skill Match:
                               </span>{" "}
-                              {renderMatchScore(
-                                matchData.scores.skill_match || 0
-                              )}
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded ${renderMatchScore(
+                                  matchData.scores.skill_match || 0
+                                )}`}
+                              >
+                                {Math.round(
+                                  (matchData.scores.skill_match || 0) * 100
+                                )}
+                                %
+                              </span>
                             </div>
                             <div>
                               <span className="text-gray-500">
                                 Experience Relevance:
                               </span>{" "}
-                              {renderMatchScore(
-                                matchData.scores.experience_relevance || 0
-                              )}
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded ${renderMatchScore(
+                                  matchData.scores.experience_relevance || 0
+                                )}`}
+                              >
+                                {Math.round(
+                                  (matchData.scores.experience_relevance || 0) *
+                                    100
+                                )}
+                                %
+                              </span>
                             </div>
                             <div>
                               <span className="text-gray-500">
                                 Years of Experience:
                               </span>{" "}
-                              {renderMatchScore(
-                                matchData.scores.years_experience || 0
-                              )}
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded ${renderMatchScore(
+                                  matchData.scores.years_experience || 0
+                                )}`}
+                              >
+                                {Math.round(
+                                  (matchData.scores.years_experience || 0) * 100
+                                )}
+                                %
+                              </span>
                             </div>
                             <div>
                               <span className="text-gray-500">
                                 Project Type Match:
                               </span>{" "}
-                              {renderMatchScore(
-                                matchData.scores.project_type_match || 0
-                              )}
+                              <span
+                                className={`text-xs px-2 py-0.5 rounded ${renderMatchScore(
+                                  matchData.scores.project_type_match || 0
+                                )}`}
+                              >
+                                {Math.round(
+                                  (matchData.scores.project_type_match || 0) *
+                                    100
+                                )}
+                                %
+                              </span>
                             </div>
                           </div>
 
@@ -402,56 +439,75 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam }) => {
                 ))}
               </div>
 
+              {success && (
+                <div className="p-3 text-green-700 rounded-md bg-green-50">
+                  <p>
+                    Team assigned successfully! Team members have been updated.
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-center justify-between pt-6 border-t">
                 <div className="text-sm text-gray-500">
                   Selected {selectedEmployees.length} of{" "}
                   {matchedEmployees.length} developers
                 </div>
-                <Button
-                  onClick={assignTeam}
-                  disabled={selectedEmployees.length === 0 || isLoading}
-                  icon={
-                    isLoading ? (
-                      <svg
-                        className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
+                <div className="flex space-x-3">
+                  {onBack && (
+                    <Button
+                      variant="outline"
+                      onClick={onBack}
+                      disabled={isLoading}
+                    >
+                      Back
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleAssignTeam}
+                    disabled={selectedEmployees.length === 0 || isLoading}
+                    icon={
+                      isLoading ? (
+                        <svg
+                          className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-4 h-4 mr-1"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
                           stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                    ) : (
-                      <svg
-                        className="w-4 h-4 mr-1"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    )
-                  }
-                >
-                  {isLoading ? "Assigning..." : "Assign Team"}
-                </Button>
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )
+                    }
+                  >
+                    {isLoading ? "Assigning..." : "Assign Team"}
+                  </Button>
+                </div>
               </div>
             </>
           )}

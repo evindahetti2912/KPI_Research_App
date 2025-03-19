@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ProjectCreator from "../components/project-management/ProjectCreator";
 import ProjectList from "../components/project-management/ProjectList";
@@ -13,6 +13,7 @@ const ProjectsPage = () => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const teamComponentRef = useRef(null);
 
   const handleProjectCreated = (createdProjectId) => {
     setShowCreateModal(false);
@@ -28,10 +29,21 @@ const ProjectsPage = () => {
     navigate("/projects");
   };
 
-  const handleTeamUpdated = () => {
-    // Handle team update logic if needed
-    // For now, just refresh the component
+  const handleTeamUpdated = async (employeeIds) => {
+    // Increment refresh counter to trigger ProjectList refresh
     setRefreshCounter((prev) => prev + 1);
+
+    // Refresh TeamComposition component if we are viewing it
+    if (action === "team" && teamComponentRef.current?.refreshTeam) {
+      // Allow some time for the backend to update
+      setTimeout(() => {
+        teamComponentRef.current.refreshTeam();
+      }, 500);
+    }
+  };
+
+  const handleNavigateToTeam = () => {
+    navigate(`/projects/${projectId}/team`);
   };
 
   // Render the appropriate content based on the URL params
@@ -52,6 +64,7 @@ const ProjectsPage = () => {
           case "team":
             return (
               <TeamComposition
+                ref={teamComponentRef}
                 projectId={projectId}
                 onBack={() => navigate(`/projects/${projectId}`)}
               />
@@ -107,6 +120,11 @@ const ProjectsPage = () => {
       </div>
     );
   };
+
+  // We need to forward the ref to TeamComposition when using it
+  const ForwardedTeamComposition = React.forwardRef((props, ref) => (
+    <TeamComposition {...props} ref={ref} />
+  ));
 
   return (
     <div className="container px-4 py-6 mx-auto">

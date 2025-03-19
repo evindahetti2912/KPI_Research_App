@@ -151,20 +151,20 @@ const KPIManagementPage = () => {
 
               <div className="space-y-4">
                 {employeeCriteria.map((criteria, index) => (
-                  <div key={index} className="border rounded-md p-4">
-                    <h3 className="font-medium text-gray-800 mb-2">
+                  <div key={index} className="p-4 border rounded-md">
+                    <h3 className="mb-2 font-medium text-gray-800">
                       {criteria.role}
                     </h3>
 
                     <div className="mt-2">
-                      <h4 className="text-sm font-medium text-gray-700 mb-1">
+                      <h4 className="mb-1 text-sm font-medium text-gray-700">
                         Required Skills:
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {criteria.skills.map((skill, skillIndex) => (
                           <span
                             key={skillIndex}
-                            className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
+                            className="px-2 py-1 text-xs text-blue-800 bg-blue-100 rounded"
                           >
                             {skill}
                           </span>
@@ -172,13 +172,19 @@ const KPIManagementPage = () => {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex justify-end">
+                    <div className="flex justify-end mt-4">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() =>
                           navigate("/talent-pool", {
-                            state: { skillFilter: criteria.skills.join(", ") },
+                            state: {
+                              skillFilter: criteria.skills.join(", "),
+                              projectId: projectId,
+                              roleId: index,
+                              roleName: criteria.role,
+                              isSelectingForProject: true,
+                            },
                           })
                         }
                       >
@@ -202,10 +208,10 @@ const KPIManagementPage = () => {
 
               <div className="space-y-4">
                 {Object.entries(sprintBreakdown).map(([sprint, tasks]) => (
-                  <div key={sprint} className="border rounded-md p-4">
-                    <h3 className="font-medium text-gray-800 mb-2">{sprint}</h3>
+                  <div key={sprint} className="p-4 border rounded-md">
+                    <h3 className="mb-2 font-medium text-gray-800">{sprint}</h3>
 
-                    <ul className="list-disc pl-5 space-y-1">
+                    <ul className="pl-5 space-y-1 list-disc">
                       {tasks.map((task, taskIndex) => (
                         <li key={taskIndex} className="text-sm text-gray-600">
                           {task}
@@ -230,7 +236,7 @@ const KPIManagementPage = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container px-4 py-6 mx-auto">
       <div className="mb-6">
         <div className="flex flex-wrap items-center justify-between">
           <div>
@@ -242,14 +248,14 @@ const KPIManagementPage = () => {
             </p>
           </div>
 
-          <div className="mt-4 md:mt-0 flex space-x-3">
+          <div className="flex mt-4 space-x-3 md:mt-0">
             {kpis && (
               <Button
                 variant="outline"
                 onClick={handleRegenerateKPIs}
                 icon={
                   <svg
-                    className="h-4 w-4 mr-1"
+                    className="w-4 h-4 mr-1"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -273,7 +279,7 @@ const KPIManagementPage = () => {
               onClick={() => navigate("/projects")}
               icon={
                 <svg
-                  className="h-4 w-4 mr-1"
+                  className="w-4 h-4 mr-1"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -299,7 +305,7 @@ const KPIManagementPage = () => {
           <Loading text="Loading project data..." />
         </div>
       ) : error ? (
-        <div className="bg-red-50 text-red-700 p-4 rounded-md mb-6">
+        <div className="p-4 mb-6 text-red-700 rounded-md bg-red-50">
           <p>{error}</p>
           <div className="mt-4">
             <Button variant="outline" size="sm" onClick={fetchProjectData}>
@@ -316,7 +322,7 @@ const KPIManagementPage = () => {
             />
           ) : (
             <>
-              <div className="mb-6 bg-white shadow rounded-lg overflow-hidden">
+              <div className="mb-6 overflow-hidden bg-white rounded-lg shadow">
                 <div className="border-b">
                   <nav className="flex flex-wrap">
                     <button
@@ -373,9 +379,9 @@ const KPIManagementPage = () => {
                 </div>
 
                 <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-gray-50 p-4 rounded-md">
-                      <h3 className="text-sm font-medium text-gray-700 mb-1">
+                  <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="p-4 rounded-md bg-gray-50">
+                      <h3 className="mb-1 text-sm font-medium text-gray-700">
                         Project Type
                       </h3>
                       <p className="text-lg font-semibold text-gray-900">
@@ -383,8 +389,8 @@ const KPIManagementPage = () => {
                       </p>
                     </div>
 
-                    <div className="bg-gray-50 p-4 rounded-md">
-                      <h3 className="text-sm font-medium text-gray-700 mb-1">
+                    <div className="p-4 rounded-md bg-gray-50">
+                      <h3 className="mb-1 text-sm font-medium text-gray-700">
                         Team Size
                       </h3>
                       <p className="text-lg font-semibold text-gray-900">
@@ -392,8 +398,8 @@ const KPIManagementPage = () => {
                       </p>
                     </div>
 
-                    <div className="bg-gray-50 p-4 rounded-md">
-                      <h3 className="text-sm font-medium text-gray-700 mb-1">
+                    <div className="p-4 rounded-md bg-gray-50">
+                      <h3 className="mb-1 text-sm font-medium text-gray-700">
                         Timeline
                       </h3>
                       <p className="text-lg font-semibold text-gray-900">
@@ -401,8 +407,8 @@ const KPIManagementPage = () => {
                       </p>
                     </div>
 
-                    <div className="bg-gray-50 p-4 rounded-md">
-                      <h3 className="text-sm font-medium text-gray-700 mb-1">
+                    <div className="p-4 rounded-md bg-gray-50">
+                      <h3 className="mb-1 text-sm font-medium text-gray-700">
                         Sprints
                       </h3>
                       <p className="text-lg font-semibold text-gray-900">
@@ -413,7 +419,7 @@ const KPIManagementPage = () => {
 
                   {project?.project_languages && (
                     <div className="mt-2">
-                      <h3 className="text-sm font-medium text-gray-700 mb-2">
+                      <h3 className="mb-2 text-sm font-medium text-gray-700">
                         Technologies & Languages
                       </h3>
                       <div className="flex flex-wrap gap-2">
@@ -421,7 +427,7 @@ const KPIManagementPage = () => {
                           ? project.project_languages.map((lang, index) => (
                               <span
                                 key={index}
-                                className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
+                                className="px-2 py-1 text-xs text-gray-800 bg-gray-100 rounded"
                               >
                                 {lang}
                               </span>
@@ -431,7 +437,7 @@ const KPIManagementPage = () => {
                               .map((lang, index) => (
                                 <span
                                   key={index}
-                                  className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
+                                  className="px-2 py-1 text-xs text-gray-800 bg-gray-100 rounded"
                                 >
                                   {lang.trim()}
                                 </span>

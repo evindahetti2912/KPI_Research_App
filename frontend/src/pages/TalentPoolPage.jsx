@@ -9,6 +9,7 @@ import Card from "../components/common/Card";
 import Loading from "../components/common/Loading";
 import Modal from "../components/common/Modal";
 import { employeeService } from "../services/employeeService";
+import { projectService } from "../services/projectService";
 
 const TalentPoolPage = () => {
   const { employeeId } = useParams();
@@ -29,6 +30,32 @@ const TalentPoolPage = () => {
     availability: "",
     sortBy: "name",
   });
+  
+  // Project team selection state
+  const [isSelectingForProject, setIsSelectingForProject] = useState(false);
+  const [projectContext, setProjectContext] = useState(null);
+  const [selectedEmployees, setSelectedEmployees] = useState([]);
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+
+  // Check if we're being navigated from project team selection
+  useEffect(() => {
+    if (location.state?.isSelectingForProject) {
+      setIsSelectingForProject(true);
+      setProjectContext({
+        projectId: location.state.projectId,
+        roleId: location.state.roleId,
+        roleName: location.state.roleName
+      });
+      
+      // Apply skill filter automatically
+      if (location.state.skillFilter) {
+        setFilters(prev => ({
+          ...prev,
+          skills: location.state.skillFilter
+        }));
+      }
+    }
+  }, [location.state]);
 
   // Fetch employees based on filters
   const fetchEmployees = useCallback(async () => {
@@ -118,6 +145,9 @@ const TalentPoolPage = () => {
 
   // Handle employee selection
   const handleSelectEmployee = async (id) => {
+    // In selection mode, don't navigate to employee details
+    if (isSelectingForProject) return;
+    
     // Check if employee is already in our list
     const employeeInList = employees.find((emp) => emp._id === id);
 
@@ -152,6 +182,51 @@ const TalentPoolPage = () => {
     }
   };
 
+  // Handle employee selection in project mode
+  const handleEmployeeToggle = (employee) => {
+    setSelectedEmployees(prev => {
+      // Toggle selection
+      if (prev.some(e => e._id === employee._id)) {
+        return prev.filter(e => e._id !== employee._id);
+      } else {
+        return [...prev, employee];
+      }
+    });
+  };
+
+  // Assign selected employees to the project
+  const assignEmployeesToProject = async () => {
+    if (!projectContext || selectedEmployees.length === 0) return;
+    
+    setAssignmentLoading(true);
+    setError("");
+    
+    try {
+      const employeeIds = selectedEmployees.map(emp => emp._id);
+      
+      const response = await projectService.updateProject(projectContext.projectId, {
+        team: {
+          employee_ids: employeeIds,
+          role: projectContext.roleName,
+          role_id: projectContext.roleId,
+          updated_at: new Date().toISOString()
+        }
+      });
+      
+      if (response.success) {
+        // Navigate back to the KPI management page
+        navigate(`/kpi-management/${projectContext.projectId}`);
+      } else {
+        setError(response.message || "Failed to assign team members");
+      }
+    } catch (error) {
+      console.error("Error assigning team members:", error);
+      setError("An error occurred while assigning team members");
+    } finally {
+      setAssignmentLoading(false);
+    }
+  };
+
   // Handle filter changes from EmployeeFilter component
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
@@ -162,20 +237,33 @@ const TalentPoolPage = () => {
     navigate("/talent-pool");
   };
 
+  // Navigate back to KPI management without making changes
+  const cancelProjectSelection = () => {
+    if (projectContext?.projectId) {
+      navigate(`/kpi-management/${projectContext.projectId}`);
+    } else {
+      setIsSelectingForProject(false);
+      setProjectContext(null);
+      setSelectedEmployees([]);
+    }
+  };
+
   return (
     <div className="container px-4 py-6 mx-auto">
       <div className="flex flex-wrap items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Talent Pool</h1>
           <p className="text-gray-600">
-            {employeeId
+            {isSelectingForProject
+              ? `Select employees for ${projectContext?.roleName || "project role"}`
+              : employeeId
               ? "View and analyze employee details"
               : "Browse and analyze employee profiles"}
           </p>
         </div>
 
         <div className="mt-4 space-x-3 md:mt-0">
-          {!employeeId && (
+          {!employeeId && !isSelectingForProject && (
             <>
               <Button
                 variant="outline"
@@ -225,7 +313,7 @@ const TalentPoolPage = () => {
             </>
           )}
 
-          {employeeId && selectedEmployee && (
+          {employeeId && selectedEmployee && !isSelectingForProject && (
             <>
               <Button
                 variant="outline"
@@ -276,6 +364,43 @@ const TalentPoolPage = () => {
           )}
         </div>
       </div>
+
+      {/* Selection mode header */}
+      {isSelectingForProject && (
+        <div className="p-4 mb-6 rounded-lg bg-blue-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-medium text-gray-800">
+                Selecting employees for: <span className="text-blue-700">{projectContext?.roleName || "Role"}</span>
+              </h3>
+              <p className="text-sm text-gray-600">
+                Selected {selectedEmployees.length} employee(s)
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <Button 
+                variant="outline" 
+                onClick={cancelProjectSelection}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={assignEmployeesToProject}
+                disabled={selectedEmployees.length === 0 || assignmentLoading}
+                icon={assignmentLoading ? (
+                  <svg className="w-4 h-4 mr-2 -ml-1 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : null}
+              >
+                {assignmentLoading ? "Assigning..." : "Assign to Project"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Display filters applied if any */}
       {!employeeId && (
@@ -403,7 +528,7 @@ const TalentPoolPage = () => {
         </div>
       )}
 
-      {employeeId ? (
+      {employeeId && !isSelectingForProject ? (
         // Single employee view
         isLoading ? (
           <div className="py-12">
@@ -500,6 +625,9 @@ const TalentPoolPage = () => {
                   <EmployeeList
                     employees={employees}
                     onSelectEmployee={(id) => navigate(`/talent-pool/${id}`)}
+                    selectionMode={isSelectingForProject}
+                    selectedEmployees={selectedEmployees}
+                    onEmployeeToggle={handleEmployeeToggle}
                   />
                 </div>
               )}
@@ -507,76 +635,115 @@ const TalentPoolPage = () => {
           </div>
 
           <div className="w-full md:w-3/4">
-            {!selectedEmployee ? (
+            {!selectedEmployee || isSelectingForProject ? (
               <Card>
                 <div className="py-8 text-center">
-                  <svg
-                    className="w-16 h-16 mx-auto mb-4 text-gray-300"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
-                  <h2 className="mb-2 text-lg font-medium text-gray-700">
-                    Talent Pool
-                  </h2>
-                  <p className="mb-6 text-gray-500">
-                    Select an employee from the list to view their details or
-                    upload a new CV to add to the talent pool.
-                  </p>
-                  <div className="flex justify-center space-x-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowFilterModal(true)}
-                      icon={
-                        <svg
-                          className="w-4 h-4 mr-1"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
+                  {isSelectingForProject ? (
+                    <>
+                      <svg
+                        className="w-16 h-16 mx-auto mb-4 text-blue-300"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                        />
+                      </svg>
+                      <h2 className="mb-2 text-lg font-medium text-gray-700">
+                        Employee Selection Mode
+                      </h2>
+                      <p className="mb-6 text-gray-500">
+                        Select employees from the list on the left to assign to{" "}
+                        <strong>{projectContext?.roleName || "project role"}</strong>
+                      </p>
+                      <div className="flex justify-center space-x-4">
+                        <Button
+                          variant={selectedEmployees.length === 0 ? "outline" : "primary"}
+                          onClick={assignEmployeesToProject}
+                          disabled={selectedEmployees.length === 0 || assignmentLoading}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                          />
-                        </svg>
-                      }
-                    >
-                      Filter Employees
-                    </Button>
-                    <Button
-                      variant="primary"
-                      onClick={() => navigate("/cv-upload")}
-                      icon={
-                        <svg
-                          className="w-4 h-4 mr-1"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
+                          {selectedEmployees.length === 0 
+                            ? "No Employees Selected" 
+                            : `Assign ${selectedEmployees.length} Employees`}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-16 h-16 mx-auto mb-4 text-gray-300"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                        />
+                      </svg>
+                      <h2 className="mb-2 text-lg font-medium text-gray-700">
+                        Talent Pool
+                      </h2>
+                      <p className="mb-6 text-gray-500">
+                        Select an employee from the list to view their details or
+                        upload a new CV to add to the talent pool.
+                      </p>
+                      <div className="flex justify-center space-x-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowFilterModal(true)}
+                          icon={
+                            <svg
+                              className="w-4 h-4 mr-1"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                              />
+                            </svg>
+                          }
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                          />
-                        </svg>
-                      }
-                    >
-                      Upload New CV
-                    </Button>
-                  </div>
+                          Filter Employees
+                        </Button>
+                        <Button
+                          variant="primary"
+                          onClick={() => navigate("/cv-upload")}
+                          icon={
+                            <svg
+                              className="w-4 h-4 mr-1"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                              />
+                            </svg>
+                          }
+                        >
+                          Upload New CV
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </Card>
             ) : (
@@ -646,28 +813,26 @@ const TalentPoolPage = () => {
                       </div>
                     )}
                     {selectedEmployee.data["Contact Information"]?.LinkedIn && (
-                      <div>
-                        <span className="text-sm font-medium text-gray-700">
-                          LinkedIn:
-                        </span>
-                        <p className="text-gray-800">
-                          <a
-                            href={
-                              selectedEmployee.data["Contact Information"]
-                                .LinkedIn
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            {
-                              selectedEmployee.data["Contact Information"]
-                                .LinkedIn
-                            }
-                          </a>
-                        </p>
-                      </div>
-                    )}
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">
+                            LinkedIn:
+                          </span>
+                          <p className="text-gray-800">
+                            
+                              href={
+                                selectedEmployee.data["Contact Information"]
+                                  .LinkedIn
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                              {
+                                selectedEmployee.data["Contact Information"]
+                                  .LinkedIn
+                              }
+                          </p>
+                        </div>
+                      )}
                   </div>
                 </Card>
 
