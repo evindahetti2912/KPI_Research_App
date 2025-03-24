@@ -11,6 +11,7 @@ const TeamComposition = ({ projectId, onBack }) => {
   const [error, setError] = useState("");
   const [teamData, setTeamData] = useState(null);
   const [employeeDetails, setEmployeeDetails] = useState([]);
+  const [roleAssignments, setRoleAssignments] = useState({});
 
   // Create a ref to expose refreshTeam method to parent components
   const refreshTeamRef = useRef(null);
@@ -41,16 +42,27 @@ const TeamComposition = ({ projectId, onBack }) => {
       if (response.success) {
         setTeamData(response.data);
 
-        // If employees are already included in the response
-        if (response.data.employees && response.data.employees.length > 0) {
-          setEmployeeDetails(response.data.employees);
+        // Get employee IDs to fetch
+        let employeeIds = response.data.employee_ids || [];
+
+        // Handle role assignments display
+        if (response.data.role_assignments) {
+          // New structure with role_assignments
+          setRoleAssignments(response.data.role_assignments);
         }
-        // Otherwise, fetch employee details if there are employee IDs
-        else if (
-          response.data.employee_ids &&
-          response.data.employee_ids.length > 0
-        ) {
-          await fetchEmployeeDetails(response.data.employee_ids);
+        // Handle legacy structure
+        else if (response.data.role) {
+          // Create a role assignments object from the legacy structure
+          setRoleAssignments({
+            [response.data.role]: response.data.employee_ids || [],
+          });
+        } else {
+          setRoleAssignments({});
+        }
+
+        // Fetch employee details if there are IDs
+        if (employeeIds.length > 0) {
+          await fetchEmployeeDetails(employeeIds);
         } else {
           // Clear employee details if no employees assigned
           setEmployeeDetails([]);

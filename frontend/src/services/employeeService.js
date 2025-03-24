@@ -201,5 +201,24 @@ export const employeeService = {
                 data: []
             };
         }
+    },
+    
+    /**
+ * Match employees to project criteria and generate specialized KPIs
+ * @param {Object} matchData - The matching criteria and KPI data
+ * @returns {Promise<Object>} - The API response
+ */
+    matchEmployeesWithKPIs: async (matchData) => {
+        try {
+            const response = await api.post('/employees/match-with-kpis', matchData);
+            return response.data;
+        } catch (error) {
+            console.error('Error matching employees with KPIs:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to match employees',
+                matched_employees: []
+            };
+        }
     }
 };

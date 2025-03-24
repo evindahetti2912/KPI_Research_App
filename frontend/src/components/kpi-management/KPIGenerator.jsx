@@ -7,6 +7,7 @@ import { kpiService } from "../../services/kpiService";
 const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [formData, setFormData] = useState({
     project_type: "",
     project_team_size: "",
@@ -14,19 +15,23 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
     project_languages: "",
     project_sprints: "",
     description: "",
+    complexity_level: "medium",
+    team_experience: "mixed",
+    expected_quality: "standard",
   });
 
   // Initialize form with project data if available
   useEffect(() => {
     if (projectData) {
-      setFormData({
+      setFormData((prev) => ({
+        ...prev,
         project_type: projectData.project_type || "",
         project_team_size: projectData.project_team_size || "",
         project_timeline: projectData.project_timeline || "",
         project_languages: projectData.project_languages || "",
         project_sprints: projectData.project_sprints || "",
         description: projectData.description || "",
-      });
+      }));
     }
   }, [projectData]);
 
@@ -120,6 +125,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
               <option value="Data Science">Data Science</option>
               <option value="Enterprise">Enterprise Solutions</option>
               <option value="Cloud">Cloud Infrastructure</option>
+              <option value="DevOps">DevOps/CI-CD</option>
             </select>
           </div>
 
@@ -221,6 +227,112 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
               onChange={handleInputChange}
             ></textarea>
           </div>
+
+          <div className="md:col-span-2">
+            <button
+              type="button"
+              className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              {showAdvanced ? (
+                <svg
+                  className="w-4 h-4 mr-1"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-4 h-4 mr-1"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              )}
+              {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
+            </button>
+          </div>
+
+          {showAdvanced && (
+            <>
+              <div>
+                <label
+                  htmlFor="complexity_level"
+                  className="block mb-1 text-sm font-medium text-gray-700"
+                >
+                  Project Complexity
+                </label>
+                <select
+                  id="complexity_level"
+                  name="complexity_level"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  value={formData.complexity_level}
+                  onChange={handleInputChange}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="very_high">Very High</option>
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="team_experience"
+                  className="block mb-1 text-sm font-medium text-gray-700"
+                >
+                  Team Experience Level
+                </label>
+                <select
+                  id="team_experience"
+                  name="team_experience"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  value={formData.team_experience}
+                  onChange={handleInputChange}
+                >
+                  <option value="junior">Mostly Junior</option>
+                  <option value="mixed">Mixed Levels</option>
+                  <option value="senior">Mostly Senior</option>
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="expected_quality"
+                  className="block mb-1 text-sm font-medium text-gray-700"
+                >
+                  Quality Expectations
+                </label>
+                <select
+                  id="expected_quality"
+                  name="expected_quality"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  value={formData.expected_quality}
+                  onChange={handleInputChange}
+                >
+                  <option value="standard">Standard</option>
+                  <option value="high">High</option>
+                  <option value="very_high">Very High (Critical System)</option>
+                </select>
+              </div>
+            </>
+          )}
         </div>
 
         {error && (
@@ -280,6 +392,10 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
         {isGenerating && (
           <div className="mt-4">
             <Loading text="Analyzing project parameters and generating KPIs..." />
+            <p className="mt-2 text-xs italic text-center text-gray-500">
+              This might take a moment as we carefully analyze your project
+              parameters to create tailored KPIs
+            </p>
           </div>
         )}
       </div>

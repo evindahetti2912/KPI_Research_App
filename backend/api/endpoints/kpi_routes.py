@@ -374,3 +374,62 @@ def adjust_project_kpis_for_changes(project_id):
             'success': False,
             'message': f"Error adjusting project KPIs for changes: {str(e)}"
         }), 500
+
+
+@kpi_blueprint.route('/projects/<project_id>/recommendations', methods=['GET'])
+def get_project_kpi_recommendations(project_id):
+    """
+    Endpoint for retrieving KPI recommendations for a project.
+    """
+    try:
+        # Convert string ID to ObjectId
+        object_id = ObjectId(project_id)
+
+        # Check if project exists
+        project = mongodb_service.find_one('Projects', {'_id': object_id})
+
+        if not project:
+            raise NotFoundError(f"Project with ID {project_id} not found")
+
+        # Get KPI document
+        kpi_doc = mongodb_service.find_one('ProjectKPIs', {'project_id': object_id})
+
+        if not kpi_doc:
+            raise NotFoundError(f"KPIs for project with ID {project_id} not found")
+
+        # Generate recommendations based on current KPIs
+        try:
+            kpis = kpi_doc.get('kpis', {})
+            recommendations = []
+
+            # Check for KPIs that are at risk or below target
+            for category, metrics in kpis.items():
+                for metric_name, metric_data in metrics.items():
+                    if metric_data.get('status') in ['At Risk', 'Below Target']:
+                        recommendations.append({
+                            'title': f"Improve {metric_name.replace('_', ' ').title()}",
+                            'description': f"This {category} metric is currently {metric_data.get('status').lower()}. Current value: {metric_data.get('value')}, Target: {metric_data.get('target')}.",
+                            'actionItems': [
+                                f"Review {category} practices related to {metric_name.replace('_', ' ')}",
+                                f"Consider adjusting the target if it's unrealistic for this project"
+                            ],
+                            'priority': 'high' if metric_data.get('status') == 'Below Target' else 'medium',
+                            'category': category
+                        })
+
+            return jsonify({
+                'success': True,
+                'recommendations': recommendations
+            })
+        except Exception as e:
+            print(f"Error generating recommendations: {str(e)}")
+            return jsonify({
+                'success': True,
+                'recommendations': []
+            })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f"Error retrieving project KPI recommendations: {str(e)}"
+        }), 500

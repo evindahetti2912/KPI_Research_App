@@ -9,6 +9,8 @@ const KPIAdjuster = ({ projectId, kpis, onKPIsAdjusted }) => {
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [adjustmentMode, setAdjustmentMode] = useState("progress"); // "progress" or "changes"
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [projectProgress, setProjectProgress] = useState({
     actual_velocity: "",
     actual_cycle_time: "",
@@ -16,6 +18,18 @@ const KPIAdjuster = ({ projectId, kpis, onKPIsAdjusted }) => {
     test_coverage: "",
     code_review_time: "",
     feedback_implementation_rate: "",
+    completion_percentage: "",
+  });
+  const [teamPerformance, setTeamPerformance] = useState({
+    velocity_trend: "stable",
+    quality_trend: "stable",
+    collaboration_trend: "stable",
+  });
+  const [projectChanges, setProjectChanges] = useState({
+    project_team_size: "",
+    project_timeline: "",
+    project_sprints: "",
+    project_languages: "",
   });
 
   // Initialize with current KPIs
@@ -43,6 +57,7 @@ const KPIAdjuster = ({ projectId, kpis, onKPIsAdjusted }) => {
         feedback_implementation_rate: extractNumericValue(
           kpis.adaptability?.feedback_implementation_rate?.value
         ),
+        completion_percentage: "25", // Default assumption
       };
 
       setProjectProgress(initialProgress);
@@ -57,14 +72,43 @@ const KPIAdjuster = ({ projectId, kpis, onKPIsAdjusted }) => {
     }));
   };
 
+  const handleTeamPerformanceChange = (e) => {
+    const { name, value } = e.target;
+    setTeamPerformance((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleProjectChangesChange = (e) => {
+    const { name, value } = e.target;
+    setProjectChanges((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const handleAdjustKPIs = async () => {
-    // Validate form data
-    if (
-      !projectProgress.actual_velocity ||
-      !projectProgress.actual_cycle_time
-    ) {
-      setError("Velocity and Cycle Time are required for KPI adjustment");
-      return;
+    if (adjustmentMode === "progress") {
+      // Validate form data for progress-based adjustment
+      if (
+        !projectProgress.actual_velocity ||
+        !projectProgress.actual_cycle_time
+      ) {
+        setError("Velocity and Cycle Time are required for KPI adjustment");
+        return;
+      }
+
+      if (!projectProgress.completion_percentage) {
+        setError("Project completion percentage is required");
+        return;
+      }
+    } else {
+      // Validate form data for changes-based adjustment
+      if (!Object.values(projectChanges).some((val) => val)) {
+        setError("At least one project parameter must be changed");
+        return;
+      }
     }
 
     setIsAdjusting(true);
@@ -72,28 +116,62 @@ const KPIAdjuster = ({ projectId, kpis, onKPIsAdjusted }) => {
     setSuccess(false);
 
     try {
-      // Convert input values to numbers
-      const progressData = {
-        actual_velocity: parseFloat(projectProgress.actual_velocity),
-        actual_cycle_time: parseFloat(projectProgress.actual_cycle_time),
-        defect_rate: projectProgress.defect_rate
-          ? parseFloat(projectProgress.defect_rate)
-          : undefined,
-        test_coverage: projectProgress.test_coverage
-          ? parseFloat(projectProgress.test_coverage)
-          : undefined,
-        code_review_time: projectProgress.code_review_time
-          ? parseFloat(projectProgress.code_review_time)
-          : undefined,
-        feedback_implementation_rate:
-          projectProgress.feedback_implementation_rate
-            ? parseFloat(projectProgress.feedback_implementation_rate)
-            : undefined,
-      };
+      let response;
 
-      const response = await kpiService.adjustKPIs(projectId, {
-        project_progress: progressData,
-      });
+      if (adjustmentMode === "progress") {
+        // Convert input values to numbers
+        const progressData = {
+          actual_velocity: parseFloat(projectProgress.actual_velocity),
+          actual_cycle_time: parseFloat(projectProgress.actual_cycle_time),
+          defect_rate: projectProgress.defect_rate
+            ? parseFloat(projectProgress.defect_rate)
+            : undefined,
+          test_coverage: projectProgress.test_coverage
+            ? parseFloat(projectProgress.test_coverage)
+            : undefined,
+          code_review_time: projectProgress.code_review_time
+            ? parseFloat(projectProgress.code_review_time)
+            : undefined,
+          feedback_implementation_rate:
+            projectProgress.feedback_implementation_rate
+              ? parseFloat(projectProgress.feedback_implementation_rate)
+              : undefined,
+          completion_percentage: parseFloat(
+            projectProgress.completion_percentage
+          ),
+        };
+
+        response = await kpiService.adjustKPIs(projectId, {
+          project_progress: progressData,
+          team_performance: showAdvanced ? teamPerformance : undefined,
+        });
+      } else {
+        // Prepare project changes data
+        const changesData = {};
+
+        Object.entries(projectChanges).forEach(([key, value]) => {
+          if (value) {
+            if (key === "project_languages") {
+              changesData[key] = value.split(",").map((l) => l.trim());
+            } else if (
+              [
+                "project_team_size",
+                "project_timeline",
+                "project_sprints",
+              ].includes(key)
+            ) {
+              changesData[key] = parseInt(value);
+            } else {
+              changesData[key] = value;
+            }
+          }
+        });
+
+        response = await kpiService.adjustKPIsForChanges(
+          projectId,
+          changesData
+        );
+      }
 
       if (response.success) {
         setSuccess(true);
@@ -119,19 +197,44 @@ const KPIAdjuster = ({ projectId, kpis, onKPIsAdjusted }) => {
     return match ? match[0] : "";
   };
 
-  return (
-    <Card
-      title="Adjust KPIs"
-      subtitle="Update KPIs based on actual project progress"
-    >
-      <div className="space-y-6">
-        <p className="text-gray-700">
-          Enter the actual metrics from your project to adjust KPI targets and
-          statuses. This helps in maintaining realistic goals as the project
-          progresses.
-        </p>
-
+  const renderProgressBasedAdjustment = () => {
+    return (
+      <>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div>
+            <h3 className="mb-3 text-sm font-medium text-gray-800">
+              Project Status
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="completion_percentage"
+                  className="block mb-1 text-sm font-medium text-gray-700"
+                >
+                  Project Completion (%)
+                </label>
+                <div className="relative mt-1 rounded-md shadow-sm">
+                  <input
+                    type="number"
+                    id="completion_percentage"
+                    name="completion_percentage"
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g. 25"
+                    value={projectProgress.completion_percentage}
+                    onChange={handleProgressChange}
+                    min="0"
+                    max="100"
+                    step="1"
+                    required
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <span className="text-gray-500 sm:text-sm">%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div>
             <h3 className="mb-3 text-sm font-medium text-gray-800">
               Productivity Metrics
@@ -315,6 +418,249 @@ const KPIAdjuster = ({ projectId, kpis, onKPIsAdjusted }) => {
           </div>
         </div>
 
+        <div className="mt-4">
+          <button
+            type="button"
+            className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            {showAdvanced ? (
+              <svg
+                className="w-4 h-4 mr-1"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-4 h-4 mr-1"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            )}
+            {showAdvanced
+              ? "Hide Team Performance Trends"
+              : "Include Team Performance Trends"}
+          </button>
+        </div>
+
+        {showAdvanced && (
+          <div className="grid grid-cols-1 gap-6 mt-4 md:grid-cols-3">
+            <div>
+              <label
+                htmlFor="velocity_trend"
+                className="block mb-1 text-sm font-medium text-gray-700"
+              >
+                Velocity Trend
+              </label>
+              <select
+                id="velocity_trend"
+                name="velocity_trend"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                value={teamPerformance.velocity_trend}
+                onChange={handleTeamPerformanceChange}
+              >
+                <option value="improving">Improving</option>
+                <option value="stable">Stable</option>
+                <option value="declining">Declining</option>
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="quality_trend"
+                className="block mb-1 text-sm font-medium text-gray-700"
+              >
+                Quality Trend
+              </label>
+              <select
+                id="quality_trend"
+                name="quality_trend"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                value={teamPerformance.quality_trend}
+                onChange={handleTeamPerformanceChange}
+              >
+                <option value="improving">Improving</option>
+                <option value="stable">Stable</option>
+                <option value="declining">Declining</option>
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="collaboration_trend"
+                className="block mb-1 text-sm font-medium text-gray-700"
+              >
+                Collaboration Trend
+              </label>
+              <select
+                id="collaboration_trend"
+                name="collaboration_trend"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                value={teamPerformance.collaboration_trend}
+                onChange={handleTeamPerformanceChange}
+              >
+                <option value="improving">Improving</option>
+                <option value="stable">Stable</option>
+                <option value="declining">Declining</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderChangesBasedAdjustment = () => {
+    return (
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div>
+          <label
+            htmlFor="project_team_size"
+            className="block mb-1 text-sm font-medium text-gray-700"
+          >
+            Updated Team Size
+          </label>
+          <input
+            type="number"
+            id="project_team_size"
+            name="project_team_size"
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Enter new team size"
+            value={projectChanges.project_team_size}
+            onChange={handleProjectChangesChange}
+            min="1"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="project_timeline"
+            className="block mb-1 text-sm font-medium text-gray-700"
+          >
+            Updated Timeline (days)
+          </label>
+          <input
+            type="number"
+            id="project_timeline"
+            name="project_timeline"
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Enter new timeline"
+            value={projectChanges.project_timeline}
+            onChange={handleProjectChangesChange}
+            min="1"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="project_sprints"
+            className="block mb-1 text-sm font-medium text-gray-700"
+          >
+            Updated Sprint Count
+          </label>
+          <input
+            type="number"
+            id="project_sprints"
+            name="project_sprints"
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Enter new sprint count"
+            value={projectChanges.project_sprints}
+            onChange={handleProjectChangesChange}
+            min="1"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="project_languages"
+            className="block mb-1 text-sm font-medium text-gray-700"
+          >
+            Updated Technologies
+          </label>
+          <input
+            type="text"
+            id="project_languages"
+            name="project_languages"
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="e.g. React, Node.js, Python"
+            value={projectChanges.project_languages}
+            onChange={handleProjectChangesChange}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Separate multiple technologies with commas
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card
+      title="Adjust KPIs"
+      subtitle="Update KPIs based on actual project progress or changes"
+    >
+      <div className="space-y-6">
+        <div className="flex flex-col space-y-4">
+          <h3 className="text-sm font-medium text-gray-700">Adjustment Mode</h3>
+          <div className="flex space-x-4">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="adjustmentMode"
+                value="progress"
+                checked={adjustmentMode === "progress"}
+                onChange={() => setAdjustmentMode("progress")}
+                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">
+                Based on Project Progress
+              </span>
+            </label>
+
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="adjustmentMode"
+                value="changes"
+                checked={adjustmentMode === "changes"}
+                onChange={() => setAdjustmentMode("changes")}
+                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">
+                Based on Project Changes
+              </span>
+            </label>
+          </div>
+
+          <p className="text-sm text-gray-500">
+            {adjustmentMode === "progress"
+              ? "Adjust KPIs based on actual project metrics and team performance."
+              : "Adjust KPIs due to changes in project parameters like team size or timeline."}
+          </p>
+        </div>
+
+        {adjustmentMode === "progress"
+          ? renderProgressBasedAdjustment()
+          : renderChangesBasedAdjustment()}
+
         {error && (
           <div className="p-3 text-red-700 rounded-md bg-red-50">
             <p>{error}</p>
@@ -325,7 +671,9 @@ const KPIAdjuster = ({ projectId, kpis, onKPIsAdjusted }) => {
           <div className="p-3 text-green-700 rounded-md bg-green-50">
             <p>
               KPIs have been successfully adjusted based on your project's
-              actual progress!
+              {adjustmentMode === "progress"
+                ? " actual progress!"
+                : " updated parameters!"}
             </p>
           </div>
         )}
@@ -380,7 +728,7 @@ const KPIAdjuster = ({ projectId, kpis, onKPIsAdjusted }) => {
 
         {isAdjusting && (
           <div className="mt-4">
-            <Loading text="Adjusting KPIs based on project progress..." />
+            <Loading text="Adjusting KPIs based on your inputs..." />
           </div>
         )}
       </div>

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from "react";
 import Card from "../common/Card";
 import Button from "../common/Button";
 import Loading from "../common/Loading";
+import Modal from "../common/Modal";
 import { Link } from "react-router-dom";
 import { projectService } from "../../services/projectService";
 import { employeeService } from "../../services/employeeService";
+import { kpiService } from "../../services/kpiService";
 
 const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -14,6 +16,11 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
   const [project, setProject] = useState(null);
   const [matchedEmployees, setMatchedEmployees] = useState([]);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
+  const [projectKPIs, setProjectKPIs] = useState(null);
+  const [showKpiModal, setShowKpiModal] = useState(false);
+  const [selectedEmployeeKPIs, setSelectedEmployeeKPIs] = useState(null);
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState("");
+  const [roleCriteria, setRoleCriteria] = useState(null);
 
   useEffect(() => {
     if (projectId) {
@@ -26,6 +33,7 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
     setError("");
 
     try {
+      // Fetch project details
       const response = await projectService.getProject(projectId);
 
       if (response.success) {
@@ -39,6 +47,14 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
         ) {
           setSelectedEmployees(response.data.team.employee_ids);
         }
+
+        // If the project has KPIs, fetch them
+        if (response.data.kpi_id) {
+          const kpiResponse = await kpiService.getProjectKPIs(projectId);
+          if (kpiResponse.success) {
+            setProjectKPIs(kpiResponse.data.kpis);
+          }
+        }
       } else {
         setError(response.message || "Failed to fetch project details");
       }
@@ -50,21 +66,35 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
     }
   };
 
-  const matchEmployees = async () => {
+  const matchEmployees = async (roleDetails = null) => {
     if (!project) return;
 
     setIsMatching(true);
     setError("");
+    setRoleCriteria(roleDetails);
 
     try {
-      const response = await employeeService.matchEmployees({
-        project_criteria: {
-          languages: project.project_languages,
-          field: project.project_type,
-          people_count: project.project_team_size,
-          project_type: project.project_type,
-        },
-      });
+      // Building project criteria
+      const projectCriteria = {
+        languages: roleDetails?.skills || project.project_languages,
+        field: project.project_type,
+        people_count: roleDetails ? 10 : project.project_team_size, // Show more candidates when matching for a specific role
+        project_type: project.project_type,
+      };
+
+      // Different API endpoint for matching with KPIs
+      let response;
+      if (projectKPIs && roleDetails) {
+        response = await employeeService.matchEmployeesWithKPIs({
+          project_criteria: projectCriteria,
+          project_kpis: projectKPIs,
+          role_criteria: roleDetails,
+        });
+      } else {
+        response = await employeeService.matchEmployees({
+          project_criteria: projectCriteria,
+        });
+      }
 
       if (response.success) {
         setMatchedEmployees(response.matched_employees || []);
@@ -97,18 +127,71 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
     setSuccess(false);
 
     try {
-      // Update project with selected team members
-      const response = await projectService.updateProject(projectId, {
-        team: {
+      // Get current team data
+      const currentTeam = project.team || {};
+
+      // Build updated team object
+      let updatedTeam = {};
+
+      // If we're assigning for a specific role
+      if (roleCriteria) {
+        // Start with existing role assignments or initialize new structure
+        let roleAssignments = {};
+
+        // First, check if the project already has a role_assignments field
+        if (currentTeam.role_assignments) {
+          roleAssignments = { ...currentTeam.role_assignments };
+        }
+        // Handle the existing legacy format where there's a single role field
+        else if (currentTeam.role) {
+          // Convert the old format to the new format
+          roleAssignments = {
+            [currentTeam.role]: currentTeam.employee_ids || [],
+          };
+        }
+
+        // Update with the newly selected employees for this role
+        roleAssignments[roleCriteria.role] = selectedEmployees;
+
+        // Get all employee IDs from all roles
+        const allEmployeeIds = new Set();
+        Object.values(roleAssignments).forEach((ids) => {
+          ids.forEach((id) => allEmployeeIds.add(id));
+        });
+
+        updatedTeam = {
+          employee_ids: Array.from(allEmployeeIds),
+          role_assignments: roleAssignments,
+          updated_at: new Date().toISOString(),
+        };
+      }
+      // If we're just assigning the general team (not role-specific)
+      else {
+        updatedTeam = {
           employee_ids: selectedEmployees,
           updated_at: new Date().toISOString(),
-        },
+        };
+
+        // Preserve existing role assignments if they exist
+        if (currentTeam.role_assignments) {
+          updatedTeam.role_assignments = currentTeam.role_assignments;
+        }
+        // Handle legacy format
+        else if (currentTeam.role) {
+          updatedTeam.role = currentTeam.role;
+          updatedTeam.role_id = currentTeam.role_id;
+        }
+      }
+
+      // Update project with new team structure
+      const response = await projectService.updateProject(projectId, {
+        team: updatedTeam,
       });
 
       if (response.success) {
         // Call the parent component's update function if provided
         if (onUpdateTeam) {
-          onUpdateTeam(selectedEmployees);
+          onUpdateTeam(updatedTeam);
         }
 
         // Show success message
@@ -132,7 +215,24 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
     }
   };
 
-  // Function to render the skill match score with appropriate color
+  const viewEmployeeKPIs = (employee) => {
+    if (employee.specialized_kpis) {
+      setSelectedEmployeeKPIs(employee.specialized_kpis);
+      setSelectedEmployeeName(employee.employee.Name);
+      setShowKpiModal(true);
+    }
+  };
+
+  // Function to render the compatibility score with appropriate color
+  const renderCompatibilityScore = (percentage) => {
+    let bgColor = "bg-red-100 text-red-800";
+    if (percentage >= 80) return "bg-green-100 text-green-800";
+    if (percentage >= 60) return "bg-yellow-100 text-yellow-800";
+    if (percentage >= 40) return "bg-orange-100 text-orange-800";
+    return bgColor;
+  };
+
+  // Function to render the match scores with appropriate colors
   const renderMatchScore = (score) => {
     let bgColor = "bg-red-100 text-red-800";
     if (score >= 0.8) return "bg-green-100 text-green-800";
@@ -141,8 +241,91 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
     return bgColor;
   };
 
+  // Function to render the status badge for a KPI
+  const renderStatusBadge = (status) => {
+    switch (status) {
+      case "On Track":
+        return (
+          <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded">
+            On Track
+          </span>
+        );
+      case "At Risk":
+        return (
+          <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded">
+            At Risk
+          </span>
+        );
+      case "Below Target":
+        return (
+          <span className="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded">
+            Below Target
+          </span>
+        );
+      default:
+        return (
+          <span className="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded">
+            {status}
+          </span>
+        );
+    }
+  };
+
+  // Function to render skills with match highlighting
+  const renderSkills = (employee) => {
+    if (!employee.skill_compatibility) return null;
+
+    const matchedSkills = employee.skill_compatibility.matched_skills || [];
+    const missingSkills = employee.skill_compatibility.missing_skills || [];
+    const partialMatches = employee.skill_compatibility.partial_matches || {};
+
+    return (
+      <div className="mt-3">
+        <h5 className="mb-1 text-xs font-medium text-gray-700">Skills:</h5>
+        <div className="flex flex-wrap gap-1">
+          {/* Matched skills */}
+          {matchedSkills.map((skill, index) => (
+            <span
+              key={`matched-${index}`}
+              className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded"
+            >
+              {skill}
+            </span>
+          ))}
+
+          {/* Partial match skills */}
+          {Object.entries(partialMatches).map(([skill, match], index) => (
+            <span
+              key={`partial-${index}`}
+              className="bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded"
+              title={`Partially matched with: ${match.matched_skill}`}
+            >
+              {skill} ({Math.round(match.similarity * 100)}%)
+            </span>
+          ))}
+
+          {/* Missing skills */}
+          {missingSkills.map((skill, index) => (
+            <span
+              key={`missing-${index}`}
+              className="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded opacity-70"
+            >
+              {skill}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <Card title="Match Developers to Project">
+    <Card
+      title={
+        roleCriteria
+          ? `Match Developers for ${roleCriteria.role}`
+          : "Match Developers to Project"
+      }
+    >
       {isLoading ? (
         <div className="py-6">
           <Loading text="Loading project details..." />
@@ -188,7 +371,7 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
                 : "Find Suitable Developers"}
             </h3>
             <Button
-              onClick={matchEmployees}
+              onClick={() => matchEmployees(roleCriteria)}
               disabled={isMatching || !project}
               icon={
                 isMatching ? (
@@ -263,7 +446,11 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
                 suitable developers for this project based on skills and
                 experience.
               </p>
-              <Button variant="outline" size="sm" onClick={matchEmployees}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => matchEmployees(roleCriteria)}
+              >
                 Find Matches
               </Button>
             </div>
@@ -301,14 +488,19 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
                           </label>
                           <div className="flex items-center ml-3 space-x-2">
                             <span className="text-xs text-gray-500">
-                              Match:
+                              Compatibility:
                             </span>
                             <span
-                              className={`text-xs px-2 py-0.5 rounded ${renderMatchScore(
-                                matchData.total_score
+                              className={`text-xs px-2 py-0.5 rounded ${renderCompatibilityScore(
+                                matchData.compatibility_percentage ||
+                                  Math.round(matchData.total_score * 100)
                               )}`}
                             >
-                              {Math.round(matchData.total_score * 100)}%
+                              {Math.round(
+                                matchData.compatibility_percentage ||
+                                  matchData.total_score * 100
+                              )}
+                              %
                             </span>
                           </div>
                         </div>
@@ -384,25 +576,20 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
                             </div>
                           </div>
 
-                          {/* Skill gaps section */}
-                          {matchData.skill_gap &&
-                            matchData.skill_gap.length > 0 && (
-                              <div className="mt-3">
-                                <div className="mb-1 text-xs font-medium text-gray-500">
-                                  Missing Skills:
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                  {matchData.skill_gap.map((skill, index) => (
-                                    <span
-                                      key={index}
-                                      className="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded"
-                                    >
-                                      {skill}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
+                          {/* Render skills with highlighting */}
+                          {renderSkills(matchData)}
+
+                          {/* Specialized KPIs button */}
+                          {matchData.specialized_kpis && (
+                            <div className="mt-3">
+                              <button
+                                onClick={() => viewEmployeeKPIs(matchData)}
+                                className="text-sm text-blue-600 underline hover:text-blue-800"
+                              >
+                                View Specialized KPIs
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -462,57 +649,112 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
                       Back
                     </Button>
                   )}
-                  <Button
-                    onClick={handleAssignTeam}
-                    disabled={selectedEmployees.length === 0 || isLoading}
-                    icon={
-                      isLoading ? (
-                        <svg
-                          className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
+                  {!roleCriteria && (
+                    <Button
+                      onClick={handleAssignTeam}
+                      disabled={selectedEmployees.length === 0 || isLoading}
+                      icon={
+                        isLoading ? (
+                          <svg
+                            className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                        ) : (
+                          <svg
+                            className="w-4 h-4 mr-1"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
                             stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-4 h-4 mr-1"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      )
-                    }
-                  >
-                    {isLoading ? "Assigning..." : "Assign Team"}
-                  </Button>
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        )
+                      }
+                    >
+                      {isLoading ? "Assigning..." : "Assign Team"}
+                    </Button>
+                  )}
                 </div>
               </div>
             </>
           )}
         </div>
       )}
+
+      {/* Employee KPIs Modal */}
+      <Modal
+        isOpen={showKpiModal}
+        onClose={() => setShowKpiModal(false)}
+        title={`Specialized KPIs for ${selectedEmployeeName}`}
+        size="lg"
+      >
+        <div className="space-y-6">
+          <p className="text-sm text-gray-600">
+            These KPIs are tailored specifically for {selectedEmployeeName}{" "}
+            based on their skills and the role requirements.
+          </p>
+
+          {selectedEmployeeKPIs &&
+            Object.entries(selectedEmployeeKPIs).map(([category, kpis]) => (
+              <div key={category} className="space-y-3">
+                <h3 className="font-medium text-gray-800 capitalize text-md">
+                  {category.replace("_", " ")}
+                </h3>
+
+                <div className="space-y-2">
+                  {Object.entries(kpis).map(([kpiName, kpiData]) => (
+                    <div key={kpiName} className="p-3 border rounded-md">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium text-gray-700 capitalize">
+                          {kpiName.replace(/_/g, " ")}
+                        </h4>
+                        {renderStatusBadge(kpiData.status)}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <div className="text-sm">
+                          <span className="text-gray-500">Current:</span>{" "}
+                          {kpiData.value}
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-gray-500">Target:</span>{" "}
+                          {kpiData.target}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={() => setShowKpiModal(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Card>
   );
 };

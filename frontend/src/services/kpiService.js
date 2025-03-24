@@ -58,11 +58,11 @@ export const kpiService = {
     },
 
     /**
-     * Get a specific chart for a project
-     * @param {string} projectId - The ID of the project
-     * @param {string} chartType - The type of chart (gantt, burndown, etc.)
-     * @returns {Promise<Object>} - The API response
-     */
+         * Get a specific chart for a project
+         * @param {string} projectId - The ID of the project
+         * @param {string} chartType - The type of chart (gantt, burndown, etc.)
+         * @returns {Promise<Object>} - The API response
+         */
     getProjectChart: async (projectId, chartType) => {
         try {
             const response = await api.get(`/kpi/projects/${projectId}/charts/${chartType}`);
@@ -166,6 +166,72 @@ export const kpiService = {
             return {
                 success: false,
                 message: error.response?.data?.message || 'Failed to get KPI history'
+            };
+        }
+    },
+
+    /**
+     * Get KPI progress data by sprint
+     * @param {string} projectId - The ID of the project
+     * @param {number} sprintNumber - The sprint number
+     * @returns {Promise<Object>} - The API response
+     */
+    getKPIProgressBySprint: async (projectId, sprintNumber) => {
+        try {
+            const response = await api.get(`/kpi/projects/${projectId}/progress/${sprintNumber}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error getting KPI progress:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to get KPI progress data',
+                data: {}
+            };
+        }
+    },
+
+    /**
+     * Generate KPI recommendations based on current project status
+     * @param {string} projectId - The ID of the project
+     * @returns {Promise<Object>} - The API response
+     */
+    generateKPIRecommendations: async (projectId) => {
+        try {
+            const response = await api.get(`/kpi/projects/${projectId}/recommendations`);
+            return response.data;
+        } catch (error) {
+            console.error('Error generating KPI recommendations:', error);
+            // Check if it's a 404 error (endpoint doesn't exist)
+            if (error.response && error.response.status === 404) {
+                return {
+                    success: true,
+                    message: 'KPI recommendations feature not available',
+                    recommendations: []
+                };
+            }
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to generate recommendations',
+                recommendations: []
+            };
+        }
+    },
+
+    /**
+     * Recalibrate KPIs mid-project
+     * @param {string} projectId - The ID of the project
+     * @param {Object} recalibrationData - The data for recalibration
+     * @returns {Promise<Object>} - The API response
+     */
+    recalibrateKPIs: async (projectId, recalibrationData) => {
+        try {
+            const response = await api.post(`/kpi/projects/${projectId}/recalibrate`, recalibrationData);
+            return response.data;
+        } catch (error) {
+            console.error('Error recalibrating KPIs:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to recalibrate KPIs'
             };
         }
     }

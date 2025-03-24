@@ -6,6 +6,7 @@ import GanttChartView from "../components/kpi-management/GanttChartView";
 import BurndownChartView from "../components/kpi-management/BurndownChartView";
 import KPIAdjuster from "../components/kpi-management/KPIAdjuster";
 import KPIRadarChart from "../components/kpi-management/KPIRadarChart";
+import KPIProgressTracker from "../components/kpi-management/KPIProgressTracker";
 import Card from "../components/common/Card";
 import Button from "../components/common/Button";
 import Loading from "../components/common/Loading";
@@ -27,6 +28,7 @@ const KPIManagementPage = () => {
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [chartPaths, setChartPaths] = useState({});
+  const [kpiRecommendations, setKpiRecommendations] = useState([]);
 
   // Fetch project and KPIs on component mount
   useEffect(() => {
@@ -65,6 +67,9 @@ const KPIManagementPage = () => {
           if (kpiResponse.data.charts) {
             setChartPaths(kpiResponse.data.charts);
           }
+
+          // Fetch KPI recommendations
+          fetchKPIRecommendations();
         } else {
           setError(kpiResponse.message || "Failed to fetch KPI data");
         }
@@ -74,6 +79,25 @@ const KPIManagementPage = () => {
       setError("An error occurred while fetching project data");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // In the fetchKPIRecommendations function
+  const fetchKPIRecommendations = async () => {
+    try {
+      const recommendationsResponse =
+        await kpiService.generateKPIRecommendations(projectId);
+      if (recommendationsResponse.success) {
+        setKpiRecommendations(recommendationsResponse.recommendations || []);
+      } else {
+        // If the endpoint doesn't exist or returns an error, just set empty recommendations
+        setKpiRecommendations([]);
+        console.log("KPI recommendations not available");
+      }
+    } catch (error) {
+      console.error("Error fetching KPI recommendations:", error);
+      // Set empty recommendations array to prevent errors
+      setKpiRecommendations([]);
     }
   };
 
@@ -180,6 +204,21 @@ const KPIManagementPage = () => {
           />
         );
 
+      case "progress":
+        return (
+          <KPIProgressTracker
+            projectId={projectId}
+            kpis={kpis}
+            sprintData={Array.from(
+              { length: project?.project_sprints || 5 },
+              (_, i) => ({
+                number: i + 1,
+                status: i < 2 ? "completed" : i < 3 ? "in-progress" : "planned",
+              })
+            )}
+          />
+        );
+
       case "team":
         return (
           <Card title="Team Criteria">
@@ -261,6 +300,111 @@ const KPIManagementPage = () => {
                   </div>
                 ))}
               </div>
+            </div>
+          </Card>
+        );
+
+      case "recommendations":
+        return (
+          <Card title="KPI Improvement Recommendations">
+            <div className="space-y-6">
+              <p className="text-gray-700">
+                Based on current project metrics, here are recommendations to
+                improve performance:
+              </p>
+
+              {kpiRecommendations.length > 0 ? (
+                <div className="space-y-4">
+                  {kpiRecommendations.map((recommendation, index) => (
+                    <div key={index} className="p-4 border rounded-md">
+                      <div className="flex items-start">
+                        <div
+                          className={`p-2 mr-3 rounded-full ${
+                            recommendation.priority === "high"
+                              ? "bg-red-100"
+                              : recommendation.priority === "medium"
+                              ? "bg-yellow-100"
+                              : "bg-blue-100"
+                          }`}
+                        >
+                          <svg
+                            className="w-5 h-5 text-gray-700"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            ></path>
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className="mb-2 font-medium text-gray-800">
+                            {recommendation.title}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {recommendation.description}
+                          </p>
+
+                          {recommendation.actionItems &&
+                            recommendation.actionItems.length > 0 && (
+                              <div className="mt-3">
+                                <h4 className="mb-1 text-xs font-medium text-gray-700">
+                                  Suggested Actions:
+                                </h4>
+                                <ul className="pl-5 space-y-1 list-disc">
+                                  {recommendation.actionItems.map(
+                                    (action, actionIndex) => (
+                                      <li
+                                        key={actionIndex}
+                                        className="text-sm text-gray-600"
+                                      >
+                                        {action}
+                                      </li>
+                                    )
+                                  )}
+                                </ul>
+                              </div>
+                            )}
+
+                          <div className="flex mt-3">
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded ${
+                                recommendation.priority === "high"
+                                  ? "bg-red-100 text-red-800"
+                                  : recommendation.priority === "medium"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {recommendation.priority.charAt(0).toUpperCase() +
+                                recommendation.priority.slice(1)}{" "}
+                              Priority
+                            </span>
+
+                            {recommendation.category && (
+                              <span className="ml-2 text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-800">
+                                {recommendation.category}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-8 text-center">
+                  <p className="text-gray-500">
+                    No recommendations available yet. Recommendations will be
+                    generated as project data is collected.
+                  </p>
+                </div>
+              )}
             </div>
           </Card>
         );
@@ -389,10 +533,10 @@ const KPIManagementPage = () => {
           ) : (
             <>
               <div className="mb-6 overflow-hidden bg-white rounded-lg shadow">
-                <div className="border-b">
-                  <nav className="flex flex-wrap">
+                <div className="overflow-x-auto border-b">
+                  <nav className="flex flex-nowrap">
                     <button
-                      className={`px-6 py-3 text-sm font-medium ${
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
                         activeTab === "dashboard"
                           ? "text-blue-600 border-b-2 border-blue-600"
                           : "text-gray-500 hover:text-gray-700"
@@ -402,7 +546,17 @@ const KPIManagementPage = () => {
                       Dashboard
                     </button>
                     <button
-                      className={`px-6 py-3 text-sm font-medium ${
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
+                        activeTab === "progress"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      onClick={() => setActiveTab("progress")}
+                    >
+                      Progress Tracker
+                    </button>
+                    <button
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
                         activeTab === "radar"
                           ? "text-blue-600 border-b-2 border-blue-600"
                           : "text-gray-500 hover:text-gray-700"
@@ -412,7 +566,7 @@ const KPIManagementPage = () => {
                       Radar Chart
                     </button>
                     <button
-                      className={`px-6 py-3 text-sm font-medium ${
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
                         activeTab === "gantt"
                           ? "text-blue-600 border-b-2 border-blue-600"
                           : "text-gray-500 hover:text-gray-700"
@@ -422,7 +576,7 @@ const KPIManagementPage = () => {
                       Gantt Chart
                     </button>
                     <button
-                      className={`px-6 py-3 text-sm font-medium ${
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
                         activeTab === "burndown"
                           ? "text-blue-600 border-b-2 border-blue-600"
                           : "text-gray-500 hover:text-gray-700"
@@ -432,7 +586,7 @@ const KPIManagementPage = () => {
                       Burndown Chart
                     </button>
                     <button
-                      className={`px-6 py-3 text-sm font-medium ${
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
                         activeTab === "team"
                           ? "text-blue-600 border-b-2 border-blue-600"
                           : "text-gray-500 hover:text-gray-700"
@@ -442,7 +596,7 @@ const KPIManagementPage = () => {
                       Team Criteria
                     </button>
                     <button
-                      className={`px-6 py-3 text-sm font-medium ${
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
                         activeTab === "sprints"
                           ? "text-blue-600 border-b-2 border-blue-600"
                           : "text-gray-500 hover:text-gray-700"
@@ -450,6 +604,16 @@ const KPIManagementPage = () => {
                       onClick={() => setActiveTab("sprints")}
                     >
                       Sprint Breakdown
+                    </button>
+                    <button
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
+                        activeTab === "recommendations"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      onClick={() => setActiveTab("recommendations")}
+                    >
+                      Recommendations
                     </button>
                   </nav>
                 </div>

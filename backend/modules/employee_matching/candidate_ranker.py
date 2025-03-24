@@ -10,15 +10,17 @@ class CandidateRanker:
     """
 
     @staticmethod
-    def rank_candidates(candidates, project_criteria, weights=None):
+    def rank_candidates(candidates, project_criteria, weights=None, include_all_matches=True):
         """
         Rank candidates based on their match to project criteria.
+        Includes all candidates with at least one matching skill when include_all_matches is True.
 
         Args:
             candidates: List of candidate data.
             project_criteria: Dictionary of project requirements.
             weights: Dictionary of weights for different criteria.
                     Default is equal weighting.
+            include_all_matches: Include candidates with at least one matching skill.
 
         Returns:
             list: Sorted list of candidates with scores.
@@ -44,12 +46,19 @@ class CandidateRanker:
             # Calculate weighted total score
             total_score = sum(weights.get(key, 0) * scores.get(key, 0) for key in weights)
 
-            # Add candidate with scores to the result list
-            ranked_candidates.append({
-                "candidate": candidate,
-                "scores": scores,
-                "total_score": total_score
-            })
+            # Check if candidate has any matching skills
+            skill_compatibility = scores.get("skill_compatibility", {})
+            has_match = skill_compatibility.get("has_match", False)
+
+            # Include candidate if they have at least one matching skill or if we're including all
+            if include_all_matches or has_match:
+                # Add candidate with scores to the result list
+                ranked_candidates.append({
+                    "candidate": candidate,
+                    "scores": scores,
+                    "total_score": total_score,
+                    "compatibility_percentage": skill_compatibility.get("compatibility_percentage", 0)
+                })
 
         # Sort candidates by total score (descending)
         ranked_candidates.sort(key=lambda x: x["total_score"], reverse=True)
@@ -79,6 +88,10 @@ class CandidateRanker:
         # Calculate skill match score
         skill_match = SkillMatcher.calculate_skill_similarity(candidate_skills, project_languages)
         scores["skill_match"] = skill_match
+
+        # Calculate detailed skill compatibility
+        skill_compatibility = SkillMatcher.calculate_skill_compatibility(candidate_skills, project_languages)
+        scores["skill_compatibility"] = skill_compatibility
 
         # 2. Experience Relevance Score
         experience_items = candidate.get("Experience", [])

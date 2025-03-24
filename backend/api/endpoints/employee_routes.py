@@ -330,3 +330,90 @@ def get_career_path(employee_id):
             'success': False,
             'message': f"Error retrieving career path: {str(e)}"
         }), 500
+
+
+@employee_blueprint.route('/match-with-kpis', methods=['POST'])
+def match_employees_with_kpis():
+    """
+    Endpoint for matching employees to project criteria with specialized KPIs.
+    """
+    try:
+        data = request.json
+
+        if not data:
+            raise ValidationError("No data provided")
+
+        # Extract project criteria
+        project_criteria = data.get('project_criteria', {})
+        project_kpis = data.get('project_kpis', {})
+        role_criteria = data.get('role_criteria', {})
+
+        if not project_criteria:
+            raise ValidationError("No project criteria provided")
+
+        # Get the number of employees to match
+        people_count = int(project_criteria.get('people_count', 5))
+
+        # Get all employees from MongoDB
+        employees = mongodb_service.find_many('Resumes')
+
+        # Import candidate ranker here to avoid circular imports
+        from modules.employee_matching.candidate_ranker import CandidateRanker
+        from modules.employee_matching.skill_matcher import SkillMatcher
+        from modules.employee_matching.experience_analyzer import ExperienceAnalyzer
+        from modules.kpi_generation.individual_kpi_generator import IndividualKPIGenerator
+
+        # Rank all candidates - include even those with partial matches
+        ranked_candidates = CandidateRanker.rank_candidates(
+            employees, project_criteria, include_all_matches=True
+        )
+
+        # Select the top N candidates
+        top_candidates = CandidateRanker.select_best_candidates(ranked_candidates, count=people_count)
+
+        # Prepare response
+        matched_employees = []
+
+        for candidate_data in top_candidates:
+            candidate = candidate_data['candidate']
+            scores = candidate_data['scores']
+            total_score = candidate_data['total_score']
+            compatibility_percentage = candidate_data.get('compatibility_percentage', 0)
+
+            # Convert ObjectId to string
+            candidate['_id'] = str(candidate['_id'])
+
+            # Get skill gap and compatibility details
+            candidate_skills = candidate.get('Skills', [])
+            project_languages = project_criteria.get('languages', '').split(',') if isinstance(
+                project_criteria.get('languages'), str) else project_criteria.get('languages', [])
+            skill_compatibility = SkillMatcher.calculate_skill_compatibility(candidate_skills, project_languages)
+
+            # Generate specialized KPIs if project KPIs are provided
+            specialized_kpis = None
+            if project_kpis and role_criteria:
+                specialized_kpis = IndividualKPIGenerator.generate_individual_kpis(
+                    project_kpis, role_criteria, candidate
+                )
+
+            matched_employees.append({
+                'employee': candidate,
+                'scores': scores,
+                'total_score': total_score,
+                'compatibility_percentage': compatibility_percentage,
+                'skill_compatibility': skill_compatibility,
+                'specialized_kpis': specialized_kpis
+            })
+
+        return jsonify({
+            'success': True,
+            'matched_employees': matched_employees,
+            'total_candidates': len(employees),
+            'total_matches': len(matched_employees)
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f"Error matching employees: {str(e)}"
+        }), 500
