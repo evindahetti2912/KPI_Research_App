@@ -3,6 +3,7 @@ from modules.employee_matching.experience_analyzer import ExperienceAnalyzer
 from modules.employee_matching.fuzzy_matching import FuzzyMatcher
 
 
+
 class CandidateRanker:
     """
     Class for ranking candidates based on their match to project requirements.

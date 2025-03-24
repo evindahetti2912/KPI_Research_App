@@ -5,6 +5,7 @@ import KPIDashboard from "../components/kpi-management/KPIDashboard";
 import GanttChartView from "../components/kpi-management/GanttChartView";
 import BurndownChartView from "../components/kpi-management/BurndownChartView";
 import KPIAdjuster from "../components/kpi-management/KPIAdjuster";
+import KPIRadarChart from "../components/kpi-management/KPIRadarChart";
 import Card from "../components/common/Card";
 import Button from "../components/common/Button";
 import Loading from "../components/common/Loading";
@@ -25,6 +26,7 @@ const KPIManagementPage = () => {
   const [error, setError] = useState("");
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [chartPaths, setChartPaths] = useState({});
 
   // Fetch project and KPIs on component mount
   useEffect(() => {
@@ -58,6 +60,11 @@ const KPIManagementPage = () => {
           setGanttData(kpiResponse.data.gantt_chart_data || []);
           setEmployeeCriteria(kpiResponse.data.employee_criteria || []);
           setSprintBreakdown(kpiResponse.data.sprint_breakdown || {});
+
+          // Set chart paths if available
+          if (kpiResponse.data.charts) {
+            setChartPaths(kpiResponse.data.charts);
+          }
         } else {
           setError(kpiResponse.message || "Failed to fetch KPI data");
         }
@@ -93,7 +100,15 @@ const KPIManagementPage = () => {
         },
       });
 
-      if (!response.success) {
+      if (response.success) {
+        // Set chart paths if returned
+        if (response.data && response.data.charts) {
+          setChartPaths(response.data.charts);
+        }
+
+        // Refresh project data to get updated KPI ID
+        fetchProjectData();
+      } else {
         console.error("Failed to save KPIs to project:", response.message);
       }
     } catch (error) {
@@ -107,10 +122,32 @@ const KPIManagementPage = () => {
   };
 
   const handleRegenerateKPIs = () => {
-    setKPIs(null);
-    setGanttData([]);
-    setEmployeeCriteria([]);
-    setSprintBreakdown({});
+    if (
+      window.confirm(
+        "Are you sure you want to regenerate KPIs? This will replace all existing KPI data."
+      )
+    ) {
+      setKPIs(null);
+      setGanttData([]);
+      setEmployeeCriteria([]);
+      setSprintBreakdown({});
+      setChartPaths({});
+    }
+  };
+
+  const handleExportReport = async () => {
+    try {
+      setIsLoading(true);
+      const response = await kpiService.exportKPIReport(projectId);
+      if (!response.success) {
+        setError("Failed to export KPI report. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      setError("An error occurred while exporting the report");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const renderTabContent = () => {
@@ -122,6 +159,9 @@ const KPIManagementPage = () => {
             onAdjustKPIs={() => setShowAdjustModal(true)}
           />
         );
+
+      case "radar":
+        return <KPIRadarChart kpis={kpis} />;
 
       case "gantt":
         return (
@@ -250,28 +290,54 @@ const KPIManagementPage = () => {
 
           <div className="flex mt-4 space-x-3 md:mt-0">
             {kpis && (
-              <Button
-                variant="outline"
-                onClick={handleRegenerateKPIs}
-                icon={
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                }
-              >
-                Regenerate KPIs
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleExportReport}
+                  disabled={isLoading}
+                  icon={
+                    <svg
+                      className="w-4 h-4 mr-1"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                  }
+                >
+                  Export Report
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={handleRegenerateKPIs}
+                  icon={
+                    <svg
+                      className="w-4 h-4 mr-1"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  }
+                >
+                  Regenerate KPIs
+                </Button>
+              </>
             )}
 
             <Button
@@ -334,6 +400,16 @@ const KPIManagementPage = () => {
                       onClick={() => setActiveTab("dashboard")}
                     >
                       Dashboard
+                    </button>
+                    <button
+                      className={`px-6 py-3 text-sm font-medium ${
+                        activeTab === "radar"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      onClick={() => setActiveTab("radar")}
+                    >
+                      Radar Chart
                     </button>
                     <button
                       className={`px-6 py-3 text-sm font-medium ${

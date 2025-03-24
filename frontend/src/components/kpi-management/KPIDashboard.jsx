@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Card from "../common/Card";
 import Button from "../common/Button";
 
@@ -9,12 +9,47 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
     collaboration: true,
     adaptability: true,
   });
+  const [categoryStats, setCategoryStats] = useState({});
+
+  useEffect(() => {
+    if (kpis) {
+      calculateCategoryStats();
+    }
+  }, [kpis]);
+
+  const calculateCategoryStats = () => {
+    const stats = {};
+
+    Object.entries(kpis).forEach(([category, kpiItems]) => {
+      const statuses = Object.values(kpiItems).map((item) => item.status);
+
+      stats[category] = {
+        total: statuses.length,
+        onTrack: statuses.filter((s) => s === "On Track").length,
+        atRisk: statuses.filter((s) => s === "At Risk").length,
+        belowTarget: statuses.filter((s) => s === "Below Target").length,
+        score:
+          (statuses.filter((s) => s === "On Track").length / statuses.length) *
+          100,
+      };
+    });
+
+    setCategoryStats(stats);
+  };
 
   const toggleCategory = (category) => {
     setExpandedCategories((prev) => ({
       ...prev,
       [category]: !prev[category],
     }));
+  };
+
+  const toggleAllCategories = (expand) => {
+    const newState = {};
+    Object.keys(expandedCategories).forEach((key) => {
+      newState[key] = expand;
+    });
+    setExpandedCategories(newState);
   };
 
   // Function to get status color
@@ -34,8 +69,8 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
   // Function to render KPI item
   const renderKPIItem = (kpiName, kpiData) => {
     return (
-      <div key={kpiName} className="border rounded-md overflow-hidden mb-4">
-        <div className="bg-gray-50 p-3 flex flex-wrap justify-between items-center">
+      <div key={kpiName} className="mb-4 overflow-hidden border rounded-md">
+        <div className="flex flex-wrap items-center justify-between p-3 bg-gray-50">
           <h4 className="font-medium text-gray-700 capitalize">
             {kpiName.replace(/_/g, " ")}
           </h4>
@@ -48,7 +83,7 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
           </span>
         </div>
         <div className="p-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <span className="text-sm font-medium text-gray-700">
                 Current Value:{" "}
@@ -67,20 +102,13 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
     );
   };
 
-  // Function to render KPI category
-  const renderKPICategory = (category, categoryData) => {
-    if (!categoryData) return null;
-
-    const isExpanded = expandedCategories[category] || false;
-    let categoryTitle;
-    let categoryIcon;
-
+  // Function to get category icon
+  const getCategoryIcon = (category) => {
     switch (category) {
       case "productivity":
-        categoryTitle = "Productivity & Agile Performance";
-        categoryIcon = (
+        return (
           <svg
-            className="h-5 w-5 text-blue-500"
+            className="w-5 h-5 text-blue-500"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -94,12 +122,10 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
             />
           </svg>
         );
-        break;
       case "code_quality":
-        categoryTitle = "Code Quality & Efficiency";
-        categoryIcon = (
+        return (
           <svg
-            className="h-5 w-5 text-green-500"
+            className="w-5 h-5 text-green-500"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -113,12 +139,10 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
             />
           </svg>
         );
-        break;
       case "collaboration":
-        categoryTitle = "Collaboration & Communication";
-        categoryIcon = (
+        return (
           <svg
-            className="h-5 w-5 text-purple-500"
+            className="w-5 h-5 text-purple-500"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -132,12 +156,10 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
             />
           </svg>
         );
-        break;
       case "adaptability":
-        categoryTitle = "Adaptability & Continuous Improvement";
-        categoryIcon = (
+        return (
           <svg
-            className="h-5 w-5 text-indigo-500"
+            className="w-5 h-5 text-indigo-500"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -151,14 +173,10 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
             />
           </svg>
         );
-        break;
       default:
-        categoryTitle =
-          category.charAt(0).toUpperCase() +
-          category.slice(1).replace(/_/g, " ");
-        categoryIcon = (
+        return (
           <svg
-            className="h-5 w-5 text-gray-500"
+            className="w-5 h-5 text-gray-500"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -173,23 +191,45 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
           </svg>
         );
     }
+  };
 
-    // Calculate status counts
-    const statuses = Object.values(categoryData).map((kpi) => kpi.status);
-    const onTrackCount = statuses.filter(
-      (status) => status === "On Track"
-    ).length;
-    const atRiskCount = statuses.filter(
-      (status) => status === "At Risk"
-    ).length;
-    const belowTargetCount = statuses.filter(
-      (status) => status === "Below Target"
-    ).length;
+  // Function to get category title
+  const getCategoryTitle = (category) => {
+    switch (category) {
+      case "productivity":
+        return "Productivity & Agile Performance";
+      case "code_quality":
+        return "Code Quality & Efficiency";
+      case "collaboration":
+        return "Collaboration & Communication";
+      case "adaptability":
+        return "Adaptability & Continuous Improvement";
+      default:
+        return (
+          category.charAt(0).toUpperCase() +
+          category.slice(1).replace(/_/g, " ")
+        );
+    }
+  };
+
+  // Function to render KPI category
+  const renderKPICategory = (category, categoryData) => {
+    if (!categoryData) return null;
+
+    const isExpanded = expandedCategories[category] || false;
+    const categoryTitle = getCategoryTitle(category);
+    const categoryIcon = getCategoryIcon(category);
+    const stats = categoryStats[category] || {
+      onTrack: 0,
+      atRisk: 0,
+      belowTarget: 0,
+      total: 0,
+    };
 
     return (
-      <div className="mb-6 border rounded-lg overflow-hidden">
+      <div className="mb-6 overflow-hidden border rounded-lg">
         <div
-          className="bg-white p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 shadow-sm"
+          className="flex items-center justify-between p-4 bg-white shadow-sm cursor-pointer hover:bg-gray-50"
           onClick={() => toggleCategory(category)}
         >
           <div className="flex items-center">
@@ -199,27 +239,27 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
 
           <div className="flex items-center space-x-3">
             <div className="flex space-x-2">
-              {onTrackCount > 0 && (
+              {stats.onTrack > 0 && (
                 <span className="bg-green-100 text-green-800 text-xs px-2.5 py-0.5 rounded">
-                  {onTrackCount} On Track
+                  {stats.onTrack} On Track
                 </span>
               )}
-              {atRiskCount > 0 && (
+              {stats.atRisk > 0 && (
                 <span className="bg-yellow-100 text-yellow-800 text-xs px-2.5 py-0.5 rounded">
-                  {atRiskCount} At Risk
+                  {stats.atRisk} At Risk
                 </span>
               )}
-              {belowTargetCount > 0 && (
+              {stats.belowTarget > 0 && (
                 <span className="bg-red-100 text-red-800 text-xs px-2.5 py-0.5 rounded">
-                  {belowTargetCount} Below Target
+                  {stats.belowTarget} Below Target
                 </span>
               )}
             </div>
 
-            <button className="text-gray-400 focus:outline-none">
+            <div className="relative w-8 h-8">
               {isExpanded ? (
                 <svg
-                  className="h-5 w-5"
+                  className="w-5 h-5 text-gray-400"
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
                   fill="currentColor"
@@ -232,7 +272,7 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
                 </svg>
               ) : (
                 <svg
-                  className="h-5 w-5"
+                  className="w-5 h-5 text-gray-400"
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
                   fill="currentColor"
@@ -244,12 +284,33 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
                   />
                 </svg>
               )}
-            </button>
+            </div>
           </div>
         </div>
 
         {isExpanded && (
           <div className="p-4 bg-gray-50">
+            {/* Progress bar for category health */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-gray-700">
+                  Category Health: {Math.round(stats.score)}%
+                </span>
+              </div>
+              <div className="w-full h-2 bg-gray-200 rounded-full">
+                <div
+                  className={`h-2 rounded-full ${
+                    stats.score >= 80
+                      ? "bg-green-500"
+                      : stats.score >= 60
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                  }`}
+                  style={{ width: `${stats.score}%` }}
+                ></div>
+              </div>
+            </div>
+
             {Object.entries(categoryData).map(([kpiName, kpiData]) =>
               renderKPIItem(kpiName, kpiData)
             )}
@@ -271,10 +332,24 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
     );
   }
 
+  // Calculate overall project health
+  const calculateOverallHealth = () => {
+    if (!Object.keys(categoryStats).length) return 0;
+
+    const totalScore = Object.values(categoryStats).reduce(
+      (sum, cat) => sum + cat.score,
+      0
+    );
+
+    return totalScore / Object.keys(categoryStats).length;
+  };
+
+  const overallHealth = calculateOverallHealth();
+
   return (
     <div>
-      <div className="mb-6 bg-white shadow rounded-lg p-6">
-        <div className="flex flex-wrap justify-between items-center mb-6">
+      <div className="p-6 mb-6 bg-white rounded-lg shadow">
+        <div className="flex flex-wrap items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-900">KPI Dashboard</h2>
             <p className="text-gray-600">
@@ -288,7 +363,7 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
               onClick={onAdjustKPIs}
               icon={
                 <svg
-                  className="h-4 w-4 mr-1"
+                  className="w-4 h-4 mr-1"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -308,11 +383,37 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 p-4 rounded-md">
+        {/* Overall Project Health */}
+        <div className="p-4 mb-6 rounded-lg bg-gray-50">
+          <h3 className="mb-2 text-lg font-medium text-gray-800">
+            Overall Project Health
+          </h3>
+          <div className="flex items-center">
+            <div className="w-full mr-4">
+              <div className="w-full h-4 bg-gray-200 rounded-full">
+                <div
+                  className={`h-4 rounded-full ${
+                    overallHealth >= 80
+                      ? "bg-green-500"
+                      : overallHealth >= 60
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                  }`}
+                  style={{ width: `${overallHealth}%` }}
+                ></div>
+              </div>
+            </div>
+            <span className="text-lg font-semibold">
+              {Math.round(overallHealth)}%
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="p-4 rounded-md bg-blue-50">
             <div className="flex items-center">
               <svg
-                className="h-6 w-6 text-blue-500 mr-2"
+                className="w-6 h-6 mr-2 text-blue-500"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -330,14 +431,18 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
               </h3>
             </div>
             <p className="mt-2 text-2xl font-bold text-blue-900">
-              {Object.keys(kpis.productivity || {}).length}
+              {Math.round(categoryStats.productivity?.score || 0)}%
+            </p>
+            <p className="mt-1 text-xs text-blue-600">
+              {categoryStats.productivity?.onTrack || 0} of{" "}
+              {categoryStats.productivity?.total || 0} metrics on track
             </p>
           </div>
 
-          <div className="bg-green-50 p-4 rounded-md">
+          <div className="p-4 rounded-md bg-green-50">
             <div className="flex items-center">
               <svg
-                className="h-6 w-6 text-green-500 mr-2"
+                className="w-6 h-6 mr-2 text-green-500"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -355,14 +460,18 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
               </h3>
             </div>
             <p className="mt-2 text-2xl font-bold text-green-900">
-              {Object.keys(kpis.code_quality || {}).length}
+              {Math.round(categoryStats.code_quality?.score || 0)}%
+            </p>
+            <p className="mt-1 text-xs text-green-600">
+              {categoryStats.code_quality?.onTrack || 0} of{" "}
+              {categoryStats.code_quality?.total || 0} metrics on track
             </p>
           </div>
 
-          <div className="bg-purple-50 p-4 rounded-md">
+          <div className="p-4 rounded-md bg-purple-50">
             <div className="flex items-center">
               <svg
-                className="h-6 w-6 text-purple-500 mr-2"
+                className="w-6 h-6 mr-2 text-purple-500"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -380,14 +489,18 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
               </h3>
             </div>
             <p className="mt-2 text-2xl font-bold text-purple-900">
-              {Object.keys(kpis.collaboration || {}).length}
+              {Math.round(categoryStats.collaboration?.score || 0)}%
+            </p>
+            <p className="mt-1 text-xs text-purple-600">
+              {categoryStats.collaboration?.onTrack || 0} of{" "}
+              {categoryStats.collaboration?.total || 0} metrics on track
             </p>
           </div>
 
-          <div className="bg-indigo-50 p-4 rounded-md">
+          <div className="p-4 rounded-md bg-indigo-50">
             <div className="flex items-center">
               <svg
-                className="h-6 w-6 text-indigo-500 mr-2"
+                className="w-6 h-6 mr-2 text-indigo-500"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -405,7 +518,11 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
               </h3>
             </div>
             <p className="mt-2 text-2xl font-bold text-indigo-900">
-              {Object.keys(kpis.adaptability || {}).length}
+              {Math.round(categoryStats.adaptability?.score || 0)}%
+            </p>
+            <p className="mt-1 text-xs text-indigo-600">
+              {categoryStats.adaptability?.onTrack || 0} of{" "}
+              {categoryStats.adaptability?.total || 0} metrics on track
             </p>
           </div>
         </div>
@@ -414,23 +531,16 @@ const KPIDashboard = ({ kpis, onAdjustKPIs }) => {
           renderKPICategory(category, categoryData)
         )}
 
-        <div className="mt-6 flex justify-end">
+        <div className="flex justify-end mt-6">
           <Button
             variant="primary"
             size="sm"
             onClick={() => {
-              // Expand or collapse all categories
+              // Toggle expand/collapse all based on current state
               const allExpanded = Object.values(expandedCategories).every(
                 (v) => v
               );
-              const newState = !allExpanded;
-
-              const categories = { ...expandedCategories };
-              Object.keys(categories).forEach((key) => {
-                categories[key] = newState;
-              });
-
-              setExpandedCategories(categories);
+              toggleAllCategories(!allExpanded);
             }}
           >
             {Object.values(expandedCategories).every((v) => v)

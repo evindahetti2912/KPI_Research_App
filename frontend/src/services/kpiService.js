@@ -114,5 +114,59 @@ export const kpiService = {
                 message: error.response?.data?.message || 'Failed to adjust KPIs for changes'
             };
         }
+    },
+
+    /**
+     * Export project KPI report
+     * @param {string} projectId - The ID of the project
+     * @param {string} format - The export format (pdf, excel)
+     * @returns {Promise<Object>} - The API response
+     */
+    exportKPIReport: async (projectId, format = 'pdf') => {
+        try {
+            const response = await api.get(`/kpi/projects/${projectId}/export?format=${format}`, {
+                responseType: 'blob'
+            });
+
+            // Create download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `project_kpi_report.${format}`);
+            document.body.appendChild(link);
+            link.click();
+
+            return { success: true };
+        } catch (error) {
+            console.error('Error exporting KPI report:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to export KPI report'
+            };
+        }
+    },
+
+    /**
+     * Get KPI metrics history for trend analysis
+     * @param {string} projectId - The ID of the project
+     * @param {string} metric - Specific metric to get history for
+     * @returns {Promise<Object>} - The API response
+     */
+    getKPIHistory: async (projectId, metric = null) => {
+        try {
+            let url = `/kpi/projects/${projectId}/history`;
+            if (metric) {
+                url += `?metric=${metric}`;
+            }
+
+            const response = await api.get(url);
+            return response.data;
+        } catch (error) {
+            console.error('Error getting KPI history:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to get KPI history'
+            };
+        }
     }
 };

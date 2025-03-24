@@ -13,6 +13,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
     project_timeline: "",
     project_languages: "",
     project_sprints: "",
+    description: "",
   });
 
   // Initialize form with project data if available
@@ -24,6 +25,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
         project_timeline: projectData.project_timeline || "",
         project_languages: projectData.project_languages || "",
         project_sprints: projectData.project_sprints || "",
+        description: projectData.description || "",
       });
     }
   }, [projectData]);
@@ -44,6 +46,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
       "project_timeline",
       "project_sprints",
     ];
+
     const missingFields = requiredFields.filter((field) => !formData[field]);
 
     if (missingFields.length > 0) {
@@ -65,7 +68,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
         project_team_size: parseInt(formData.project_team_size),
         project_timeline: parseInt(formData.project_timeline),
         project_sprints: parseInt(formData.project_sprints),
-        // Convert comma-separated languages to array if it's a string
+        // Handle project_languages format appropriately
         project_languages:
           typeof formData.project_languages === "string"
             ? formData.project_languages.split(",").map((lang) => lang.trim())
@@ -95,18 +98,18 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
       subtitle="Enter project details to generate relevant Key Performance Indicators"
     >
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div>
             <label
               htmlFor="project_type"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block mb-1 text-sm font-medium text-gray-700"
             >
               Project Type*
             </label>
             <select
               id="project_type"
               name="project_type"
-              className="block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               value={formData.project_type}
               onChange={handleInputChange}
               required
@@ -116,13 +119,14 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
               <option value="Mobile Development">Mobile Development</option>
               <option value="Data Science">Data Science</option>
               <option value="Enterprise">Enterprise Solutions</option>
+              <option value="Cloud">Cloud Infrastructure</option>
             </select>
           </div>
 
           <div>
             <label
               htmlFor="project_team_size"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block mb-1 text-sm font-medium text-gray-700"
             >
               Team Size*
             </label>
@@ -130,7 +134,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
               type="number"
               id="project_team_size"
               name="project_team_size"
-              className="block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Number of team members"
               value={formData.project_team_size}
               onChange={handleInputChange}
@@ -142,7 +146,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
           <div>
             <label
               htmlFor="project_timeline"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block mb-1 text-sm font-medium text-gray-700"
             >
               Project Timeline (days)*
             </label>
@@ -150,7 +154,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
               type="number"
               id="project_timeline"
               name="project_timeline"
-              className="block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Duration in days"
               value={formData.project_timeline}
               onChange={handleInputChange}
@@ -162,7 +166,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
           <div>
             <label
               htmlFor="project_sprints"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block mb-1 text-sm font-medium text-gray-700"
             >
               Number of Sprints*
             </label>
@@ -170,7 +174,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
               type="number"
               id="project_sprints"
               name="project_sprints"
-              className="block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Number of sprints"
               value={formData.project_sprints}
               onChange={handleInputChange}
@@ -182,7 +186,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
           <div className="md:col-span-2">
             <label
               htmlFor="project_languages"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block mb-1 text-sm font-medium text-gray-700"
             >
               Technologies & Languages
             </label>
@@ -190,7 +194,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
               type="text"
               id="project_languages"
               name="project_languages"
-              className="block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g. React, Node.js, Python (comma separated)"
               value={formData.project_languages}
               onChange={handleInputChange}
@@ -199,10 +203,28 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
               Separate multiple technologies with commas
             </p>
           </div>
+
+          <div className="md:col-span-2">
+            <label
+              htmlFor="description"
+              className="block mb-1 text-sm font-medium text-gray-700"
+            >
+              Project Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              rows="3"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Provide a brief description of the project"
+              value={formData.description}
+              onChange={handleInputChange}
+            ></textarea>
+          </div>
         </div>
 
         {error && (
-          <div className="bg-red-50 text-red-700 p-3 rounded-md">
+          <div className="p-3 text-red-700 rounded-md bg-red-50">
             <p>{error}</p>
           </div>
         )}
@@ -214,7 +236,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
             icon={
               isGenerating ? (
                 <svg
-                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                  className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -235,7 +257,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
                 </svg>
               ) : (
                 <svg
-                  className="h-4 w-4 mr-1"
+                  className="w-4 h-4 mr-1"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -257,7 +279,7 @@ const KPIGenerator = ({ projectData, onKPIsGenerated }) => {
 
         {isGenerating && (
           <div className="mt-4">
-            <Loading text="Generating KPIs, this may take a moment..." />
+            <Loading text="Analyzing project parameters and generating KPIs..." />
           </div>
         )}
       </div>
