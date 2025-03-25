@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import ProjectCreator from "../components/project-management/ProjectCreator";
 import ProjectList from "../components/project-management/ProjectList";
 import ProjectDetail from "../components/project-management/ProjectDetail";
@@ -11,6 +11,7 @@ import Modal from "../components/common/Modal";
 const ProjectsPage = () => {
   const { projectId, action } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);
   const teamComponentRef = useRef(null);
@@ -54,11 +55,14 @@ const ProjectsPage = () => {
       if (action) {
         switch (action) {
           case "match":
+            // Check if we have a selectedRole from location state
+            const selectedRole = location.state?.roleCriteria;
             return (
               <DeveloperMatcher
                 projectId={projectId}
+                roleCriteria={selectedRole} // Pass the selected role if available
                 onUpdateTeam={handleTeamUpdated}
-                onBack={() => navigate(`/projects/${projectId}`)}
+                onBack={() => navigate(`/projects/${projectId}/team`)}
               />
             );
           case "team":

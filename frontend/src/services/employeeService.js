@@ -161,6 +161,9 @@ export const employeeService = {
                     const skillsToMatch = filterCriteria.skills.toLowerCase().split(',').map(s => s.trim());
                     filteredEmployees = filteredEmployees.filter(employee => {
                         const employeeSkills = employee.Skills?.map(s => s.toLowerCase()) || [];
+
+                        // Check if employee has at least one of the required skills
+                        // This is the key change - we check if ANY skill matches, not ALL skills
                         return skillsToMatch.some(skill =>
                             employeeSkills.some(empSkill => empSkill.includes(skill))
                         );
@@ -202,12 +205,12 @@ export const employeeService = {
             };
         }
     },
-    
+
     /**
- * Match employees to project criteria and generate specialized KPIs
- * @param {Object} matchData - The matching criteria and KPI data
- * @returns {Promise<Object>} - The API response
- */
+     * Match employees to project criteria and generate specialized KPIs
+     * @param {Object} matchData - The matching criteria and KPI data
+     * @returns {Promise<Object>} - The API response
+     */
     matchEmployeesWithKPIs: async (matchData) => {
         try {
             const response = await api.post('/employees/match-with-kpis', matchData);

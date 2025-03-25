@@ -59,10 +59,15 @@ const EmployeeList = ({
               isSelected ? "border-blue-500 bg-blue-50" : ""
             }`}
             onClick={() => {
+              // Add debug logging
+              console.log("Employee clicked:", employee.Name, employee._id);
               if (selectionMode && onEmployeeToggle) {
                 onEmployeeToggle(employee);
               } else if (onSelectEmployee) {
-                onSelectEmployee(employee._id);
+                // Confirm the ID is being passed correctly
+                const employeeId = employee._id;
+                console.log("Calling onSelectEmployee with ID:", employeeId);
+                onSelectEmployee(employeeId);
               }
             }}
           >

@@ -265,6 +265,46 @@ export const EmployeeProvider = ({ children }) => {
     }
   };
 
+  const getEmployeesForRoleSkills = async (skills) => {
+    if (!skills || !skills.length) {
+      return employees;
+    }
+
+    setLoading(true);
+
+    try {
+      // Use the current employees list
+      let candidateEmployees = [...employees];
+
+      // If no skills are provided, return all employees
+      if (!skills.length) {
+        return candidateEmployees;
+      }
+
+      // Filter for employees with ANY matching skill (not all)
+      // This is more lenient than the normal filter
+      const skillsLower = skills.map((s) => s.toLowerCase());
+
+      const filteredForRole = candidateEmployees.filter((emp) => {
+        if (!emp.Skills || !emp.Skills.length) return false;
+
+        const empSkillsLower = emp.Skills.map((s) => s.toLowerCase());
+
+        // Return true if ANY skill matches
+        return skillsLower.some((skill) =>
+          empSkillsLower.some((empSkill) => empSkill.includes(skill))
+        );
+      });
+
+      return filteredForRole.length > 0 ? filteredForRole : candidateEmployees;
+    } catch (error) {
+      console.error("Error getting employees for role skills:", error);
+      return employees;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Set filters
   const setFilter = (filterName, value) => {
     setFilters((prev) => ({
@@ -297,6 +337,7 @@ export const EmployeeProvider = ({ children }) => {
     setCurrentEmployee,
     setFilter,
     clearFilters,
+    getEmployeesForRoleSkills,
   };
 
   return (

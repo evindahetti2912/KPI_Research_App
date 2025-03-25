@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Card from "../common/Card";
 import Button from "../common/Button";
 import Loading from "../common/Loading";
+import RoleCriteriaSelector from "./RoleCriteriaSelector";
 import { projectService } from "../../services/projectService";
 import { employeeService } from "../../services/employeeService";
 
-const TeamComposition = ({ projectId, onBack }) => {
+const TeamComposition = React.forwardRef(({ projectId, onBack }, ref) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [teamData, setTeamData] = useState(null);
   const [employeeDetails, setEmployeeDetails] = useState([]);
   const [roleAssignments, setRoleAssignments] = useState({});
+  const navigate = useNavigate();
 
   // Create a ref to expose refreshTeam method to parent components
   const refreshTeamRef = useRef(null);
@@ -22,15 +24,77 @@ const TeamComposition = ({ projectId, onBack }) => {
     }
   }, [projectId]);
 
+  // Add this method to the TeamComposition.jsx component
+
   // Public method that can be called from parent components to refresh team data
   const refreshTeam = async () => {
-    await fetchTeamData();
+    console.log("Refreshing team data");
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await projectService.getProjectTeam(projectId);
+
+      if (response.success) {
+        console.log("Team data refreshed:", response.data);
+        setTeamData(response.data);
+
+        // Get employee IDs to fetch
+        let employeeIds = response.data.employee_ids || [];
+
+        // Handle role assignments display
+        if (response.data.role_assignments) {
+          // New structure with role_assignments
+          setRoleAssignments(response.data.role_assignments);
+        }
+        // Handle legacy structure
+        else if (response.data.role) {
+          // Create a role assignments object from the legacy structure
+          setRoleAssignments({
+            [response.data.role]: response.data.employee_ids || [],
+          });
+        } else {
+          setRoleAssignments({});
+        }
+
+        // Fetch employee details if there are IDs
+        if (employeeIds.length > 0) {
+          await fetchEmployeeDetails(employeeIds);
+        } else {
+          // Clear employee details if no employees assigned
+          setEmployeeDetails([]);
+        }
+      } else {
+        setError(response.message || "Failed to refresh team data");
+      }
+    } catch (error) {
+      console.error("Error refreshing team data:", error);
+      setError("An error occurred while refreshing team data");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Expose the refreshTeam method via ref
   useEffect(() => {
-    refreshTeamRef.current = refreshTeam;
+    if (refreshTeamRef && typeof refreshTeamRef === "object") {
+      refreshTeamRef.current = {
+        refreshTeam,
+      };
+    }
   }, []);
+
+  // Expose the refreshTeam method via ref
+  useEffect(() => {
+    refreshTeamRef.current = refreshTeam;
+
+    // Expose the refreshTeam method to the forwarded ref
+    if (ref) {
+      ref.current = {
+        refreshTeam,
+      };
+    }
+  }, [ref]);
 
   const fetchTeamData = async () => {
     setIsLoading(true);
@@ -98,6 +162,14 @@ const TeamComposition = ({ projectId, onBack }) => {
       console.error("Error fetching employee details:", error);
       setError("An error occurred while fetching employee details");
     }
+  };
+
+  // Function to handle role selection
+  const handleSelectRole = (role) => {
+    // Navigate to the developer matcher with role criteria
+    navigate(`/projects/${projectId}/match`, {
+      state: { roleCriteria: role },
+    });
   };
 
   // Function to categorize skills
@@ -401,6 +473,17 @@ const TeamComposition = ({ projectId, onBack }) => {
             })}
           </div>
 
+          {/* Add Role Criteria Selector */}
+          <div className="pt-6 mt-6 border-t">
+            <h3 className="mb-4 text-lg font-medium text-gray-800">
+              Role Assignment
+            </h3>
+            <RoleCriteriaSelector
+              projectId={projectId}
+              onSelectRole={handleSelectRole}
+            />
+          </div>
+
           <div className="flex justify-end pt-4 border-t">
             {onBack ? (
               <Button
@@ -455,6 +538,6 @@ const TeamComposition = ({ projectId, onBack }) => {
       )}
     </Card>
   );
-};
+});
 
 export default TeamComposition;

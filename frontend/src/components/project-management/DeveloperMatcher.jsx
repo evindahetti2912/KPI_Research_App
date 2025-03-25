@@ -8,7 +8,12 @@ import { projectService } from "../../services/projectService";
 import { employeeService } from "../../services/employeeService";
 import { kpiService } from "../../services/kpiService";
 
-const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
+const DeveloperMatcher = ({
+  projectId,
+  roleCriteria,
+  onUpdateTeam,
+  onBack,
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
   const [error, setError] = useState("");
@@ -20,7 +25,6 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
   const [showKpiModal, setShowKpiModal] = useState(false);
   const [selectedEmployeeKPIs, setSelectedEmployeeKPIs] = useState(null);
   const [selectedEmployeeName, setSelectedEmployeeName] = useState("");
-  const [roleCriteria, setRoleCriteria] = useState(null);
 
   useEffect(() => {
     if (projectId) {
@@ -43,7 +47,8 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
         if (
           response.data.team &&
           response.data.team.employee_ids &&
-          response.data.team.employee_ids.length > 0
+          response.data.team.employee_ids.length > 0 &&
+          !roleCriteria // Only load all team members if not a role-specific match
         ) {
           setSelectedEmployees(response.data.team.employee_ids);
         }
@@ -54,6 +59,11 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
           if (kpiResponse.success) {
             setProjectKPIs(kpiResponse.data.kpis);
           }
+        }
+
+        // If we have role criteria, match employees for that role right away
+        if (roleCriteria) {
+          matchEmployees(roleCriteria);
         }
       } else {
         setError(response.message || "Failed to fetch project details");
@@ -71,7 +81,6 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
 
     setIsMatching(true);
     setError("");
-    setRoleCriteria(roleDetails);
 
     try {
       // Building project criteria
@@ -98,6 +107,11 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
 
       if (response.success) {
         setMatchedEmployees(response.matched_employees || []);
+
+        // If we're matching for a specific role, clear any previous selections
+        if (roleDetails) {
+          setSelectedEmployees([]);
+        }
       } else {
         setError(response.message || "Failed to match employees");
       }
@@ -114,6 +128,10 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
       if (prev.includes(employeeId)) {
         return prev.filter((id) => id !== employeeId);
       } else {
+        // For role-specific assignments, we might want to limit to a single employee per role
+        if (roleCriteria) {
+          return [employeeId]; // Replace previous selections for role-specific matching
+        }
         return [...prev, employeeId];
       }
     });
@@ -135,6 +153,9 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
 
       // If we're assigning for a specific role
       if (roleCriteria) {
+        console.log("Assigning for specific role:", roleCriteria.role);
+        console.log("Selected employees:", selectedEmployees);
+
         // Start with existing role assignments or initialize new structure
         let roleAssignments = {};
 
@@ -182,6 +203,8 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
           updatedTeam.role_id = currentTeam.role_id;
         }
       }
+
+      console.log("Updating team with:", updatedTeam);
 
       // Update project with new team structure
       const response = await projectService.updateProject(projectId, {
@@ -326,7 +349,7 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
           : "Match Developers to Project"
       }
     >
-      {isLoading ? (
+      {isLoading && !matchedEmployees.length ? (
         <div className="py-6">
           <Loading text="Loading project details..." />
         </div>
@@ -363,6 +386,30 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
               </div>
             </div>
           </div>
+
+          {roleCriteria && (
+            <div className="p-4 border-l-4 border-blue-500 bg-blue-50">
+              <h3 className="font-medium text-blue-800 text-md">
+                Role Requirements
+              </h3>
+              <p className="mt-1 text-sm text-blue-700">
+                Selecting a developer for: <strong>{roleCriteria.role}</strong>
+              </p>
+              <div className="mt-2">
+                <span className="text-sm text-blue-700">Required Skills:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {roleCriteria.skills.map((skill, index) => (
+                    <span
+                      key={index}
+                      className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-800">
@@ -629,7 +676,9 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
               {success && (
                 <div className="p-3 text-green-700 rounded-md bg-green-50">
                   <p>
-                    Team assigned successfully! Team members have been updated.
+                    {roleCriteria
+                      ? `Developer successfully assigned to ${roleCriteria.role} role!`
+                      : "Team assigned successfully! Team members have been updated."}
                   </p>
                 </div>
               )}
@@ -649,53 +698,55 @@ const DeveloperMatcher = ({ projectId, onUpdateTeam, onBack }) => {
                       Back
                     </Button>
                   )}
-                  {!roleCriteria && (
-                    <Button
-                      onClick={handleAssignTeam}
-                      disabled={selectedEmployees.length === 0 || isLoading}
-                      icon={
-                        isLoading ? (
-                          <svg
-                            className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-4 h-4 mr-1"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
+                  <Button
+                    onClick={handleAssignTeam}
+                    disabled={selectedEmployees.length === 0 || isLoading}
+                    icon={
+                      isLoading ? (
+                        <svg
+                          className="w-4 h-4 mr-2 -ml-1 text-white animate-spin"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
                             stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        )
-                      }
-                    >
-                      {isLoading ? "Assigning..." : "Assign Team"}
-                    </Button>
-                  )}
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-4 h-4 mr-1"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      )
+                    }
+                  >
+                    {isLoading
+                      ? "Assigning..."
+                      : roleCriteria
+                      ? `Assign to ${roleCriteria.role} Role`
+                      : "Assign Team"}
+                  </Button>
                 </div>
               </div>
             </>

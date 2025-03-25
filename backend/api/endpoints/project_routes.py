@@ -346,8 +346,25 @@ def add_employee_to_team(project_id):
     """
     try:
         data = request.json
-        if not data or 'employeeId' not in data or 'roleId' not in data:
-            raise ValidationError("Missing required employee or role data")
+        print(f"Received data for add_employee_to_team: {data}")
+
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': "No data provided"
+            }), 400
+
+        if 'employeeId' not in data:
+            return jsonify({
+                'success': False,
+                'message': "Missing employeeId in request"
+            }), 400
+
+        if 'roleId' not in data:
+            return jsonify({
+                'success': False,
+                'message': "Missing roleId in request"
+            }), 400
 
         employee_id = data['employeeId']
         role_id = data['roleId']
@@ -360,6 +377,14 @@ def add_employee_to_team(project_id):
         project = mongodb_service.find_one('Projects', {'_id': object_id})
         if not project:
             raise NotFoundError(f"Project with ID {project_id} not found")
+
+        # Check if employee exists
+        employee = mongodb_service.find_one('Resumes', {'_id': ObjectId(employee_id)})
+        if not employee:
+            return jsonify({
+                'success': False,
+                'message': f"Employee with ID {employee_id} not found"
+            }), 404
 
         # Initialize team data structure if needed
         if 'team' not in project:
@@ -379,14 +404,17 @@ def add_employee_to_team(project_id):
             # Update existing role assignment
             existing['employeeId'] = employee_id
             existing['updated_at'] = datetime.now()
+            print(f"Updated existing role assignment: {existing}")
         else:
             # Add new role assignment
-            project['team']['role_assignments'].append({
+            assignment = {
                 'roleId': role_id,
                 'roleName': role_name,
                 'employeeId': employee_id,
                 'updated_at': datetime.now()
-            })
+            }
+            project['team']['role_assignments'].append(assignment)
+            print(f"Added new role assignment: {assignment}")
 
         # Make sure employee_id is in the overall team list
         if 'employee_ids' not in project['team']:
@@ -411,6 +439,7 @@ def add_employee_to_team(project_id):
         })
 
     except Exception as e:
+        print(f"Error in add_employee_to_team: {str(e)}")
         return jsonify({
             'success': False,
             'message': f"Error assigning employee to role: {str(e)}"

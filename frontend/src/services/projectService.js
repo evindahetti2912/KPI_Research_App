@@ -130,28 +130,49 @@ export const projectService = {
     },
 
     /**
-     * Add an employee to a specific team role
-     * @param {string} projectId - The ID of the project
-     * @param {string} employeeId - The ID of the employee
-     * @param {string} roleId - The ID of the role
-     * @param {string} roleName - The name of the role
-     * @returns {Promise<Object>} - The API response
-     */
+ * Add an employee to a specific team role
+ * @param {string} projectId - The ID of the project
+ * @param {string} employeeId - The ID of the employee
+ * @param {string} roleId - The ID of the role
+ * @param {string} roleName - The name of the role
+ * @returns {Promise<Object>} - The API response
+ */
     addEmployeeToRole: async (projectId, employeeId, roleId, roleName) => {
         try {
+            // Validate inputs before making the API call
+            if (!projectId || !employeeId || !roleId) {
+                console.error("Missing required parameters for addEmployeeToRole:", {
+                    projectId, employeeId, roleId, roleName
+                });
+                return {
+                    success: false,
+                    message: "Missing required data for employee assignment"
+                };
+            }
+
+            // Add debug logging
+            console.log("Making API call to add employee to role:", {
+                projectId, employeeId, roleId, roleName: roleName || "Unknown Role"
+            });
+
             const response = await api.post(`/projects/${projectId}/team/add-employee`, {
                 employeeId,
                 roleId,
-                roleName
+                roleName: roleName || "Unknown Role"
             });
+
+            console.log("API response:", response.data);
             return response.data;
         } catch (error) {
             console.error('Error adding employee to role:', error);
+            // Provide more detailed error information
+            const errorMessage = error.response?.data?.message || 'Failed to add employee to role';
+            console.error('Error details:', errorMessage);
+
             return {
                 success: false,
-                message: error.response?.data?.message || 'Failed to add employee to role'
+                message: errorMessage
             };
         }
     }
 };
-

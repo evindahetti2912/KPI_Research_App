@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import Card from "../common/Card";
 import Button from "../common/Button";
+import { useNavigate } from "react-router-dom";
 import { kpiService } from "../../services/kpiService";
 
 const RoleCriteriaSelector = ({ projectId, onSelectRole }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [teamCriteria, setTeamCriteria] = useState([]);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchTeamCriteria();
@@ -21,6 +23,7 @@ const RoleCriteriaSelector = ({ projectId, onSelectRole }) => {
       const response = await kpiService.getProjectKPIs(projectId);
 
       if (response.success && response.data.employee_criteria) {
+        console.log("Fetched team criteria:", response.data.employee_criteria);
         setTeamCriteria(response.data.employee_criteria);
       } else {
         setError("No team criteria found for this project");
@@ -33,50 +36,27 @@ const RoleCriteriaSelector = ({ projectId, onSelectRole }) => {
     }
   };
 
-  const fetchTeamData = async () => {
-    try {
-      const response = await projectService.getProjectTeam(projectId);
+  const handleSelectRole = (role) => {
+    if (onSelectRole) {
+      onSelectRole(role);
+    } else {
+      // If no onSelectRole provided, navigate directly to talent pool
+      const skillsStr = role.skills.join(", ");
+      console.log(
+        "Role ID for navigation:",
+        role.id || teamCriteria.indexOf(role).toString()
+      );
 
-      if (response.success) {
-        let roleAssignmentsData = {};
-
-        // Handle the new structure with role_assignments
-        if (response.data.role_assignments) {
-          roleAssignmentsData = response.data.role_assignments;
-        }
-        // Handle the legacy structure with a single role
-        else if (response.data.role) {
-          roleAssignmentsData = {
-            [response.data.role]: response.data.employee_ids || [],
-          };
-        }
-
-        setRoleAssignments(roleAssignmentsData);
-
-        // Fetch details for assigned employees
-        const employeeDetailsMap = {};
-
-        for (const [role, employeeIds] of Object.entries(roleAssignmentsData)) {
-          if (employeeIds && employeeIds.length > 0) {
-            employeeDetailsMap[role] = [];
-
-            for (const id of employeeIds) {
-              try {
-                const employeeResponse = await employeeService.getEmployee(id);
-                if (employeeResponse.success) {
-                  employeeDetailsMap[role].push(employeeResponse.data);
-                }
-              } catch (err) {
-                console.error(`Error fetching employee ${id}:`, err);
-              }
-            }
-          }
-        }
-
-        setAssignedEmployees(employeeDetailsMap);
-      }
-    } catch (error) {
-      console.error("Error fetching team data:", error);
+      // Make sure all required state is included
+      navigate("/talent-pool", {
+        state: {
+          skillFilter: skillsStr,
+          projectId: projectId,
+          roleId: role.id || teamCriteria.indexOf(role).toString(),
+          roleName: role.role,
+          isSelectingForProject: true,
+        },
+      });
     }
   };
 
@@ -126,7 +106,9 @@ const RoleCriteriaSelector = ({ projectId, onSelectRole }) => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onSelectRole(role)}
+                    onClick={() =>
+                      handleSelectRole({ ...role, id: index.toString() })
+                    }
                   >
                     Find Developers
                   </Button>
