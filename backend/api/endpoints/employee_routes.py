@@ -241,6 +241,24 @@ def match_employees():
 
             employees = filtered_employees
 
+        if 'languages' in project_criteria and project_criteria['languages']:
+            filtered_employees = []
+
+            for employee in employees:
+                employee_skills = employee.get('Skills', [])
+                project_languages = project_criteria.get('languages', '').split(',') if isinstance(
+                    project_criteria.get('languages'), str) else project_criteria.get('languages', [])
+
+                # Check if employee has at least one required skill
+                similarity = SkillMatcher.calculate_skill_similarity(employee_skills, project_languages)
+
+                if similarity > 0:  # Employee has at least one matching skill
+                    # Add compatibility score to employee data
+                    employee['_compatibility'] = round(similarity * 100)
+                    filtered_employees.append(employee)
+
+            employees = filtered_employees
+
         # Rank the candidates
         ranked_candidates = CandidateRanker.rank_candidates(employees, project_criteria)
 

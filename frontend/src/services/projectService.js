@@ -127,5 +127,31 @@ export const projectService = {
                 message: error.response?.data?.message || 'Failed to match employees to project'
             };
         }
+    },
+
+    /**
+     * Add an employee to a specific team role
+     * @param {string} projectId - The ID of the project
+     * @param {string} employeeId - The ID of the employee
+     * @param {string} roleId - The ID of the role
+     * @param {string} roleName - The name of the role
+     * @returns {Promise<Object>} - The API response
+     */
+    addEmployeeToRole: async (projectId, employeeId, roleId, roleName) => {
+        try {
+            const response = await api.post(`/projects/${projectId}/team/add-employee`, {
+                employeeId,
+                roleId,
+                roleName
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error adding employee to role:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to add employee to role'
+            };
+        }
     }
 };
+

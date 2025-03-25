@@ -13,8 +13,8 @@ import { projectService } from "../services/projectService";
 
 const TalentPoolPage = () => {
   const { employeeId } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [employees, setEmployees] = useState([]);
@@ -30,32 +30,38 @@ const TalentPoolPage = () => {
     availability: "",
     sortBy: "name",
   });
-  
+
   // Project team selection state
   const [isSelectingForProject, setIsSelectingForProject] = useState(false);
-  const [projectContext, setProjectContext] = useState(null);
+  const [projectAssignmentData, setProjectAssignmentData] = useState(null);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [assignmentSuccess, setAssignmentSuccess] = useState(false);
+  const [assignmentError, setAssignmentError] = useState(null);
 
   // Check if we're being navigated from project team selection
   useEffect(() => {
-    if (location.state?.isSelectingForProject) {
-      setIsSelectingForProject(true);
-      setProjectContext({
-        projectId: location.state.projectId,
-        roleId: location.state.roleId,
-        roleName: location.state.roleName
-      });
-      
-      // Apply skill filter automatically
+    if (location.state) {
+      // Apply skill filter if provided
       if (location.state.skillFilter) {
-        setFilters(prev => ({
+        setFilters((prev) => ({
           ...prev,
-          skills: location.state.skillFilter
+          skills: location.state.skillFilter,
         }));
       }
+
+      // Check if we're selecting for a project
+      if (location.state.isSelectingForProject) {
+        setIsSelectingForProject(true);
+        setProjectAssignmentData({
+          projectId: location.state.projectId,
+          roleId: location.state.roleId,
+          roleName: location.state.roleName,
+          replaceExisting: location.state.replaceExisting || false,
+        });
+      }
     }
-  }, [location.state]);
+  }, [location]);
 
   // Fetch employees based on filters
   const fetchEmployees = useCallback(async () => {
@@ -145,9 +151,12 @@ const TalentPoolPage = () => {
 
   // Handle employee selection
   const handleSelectEmployee = async (id) => {
-    // In selection mode, don't navigate to employee details
-    if (isSelectingForProject) return;
-    
+    // In selection mode, handle the assignment
+    if (isSelectingForProject) {
+      handleEmployeeAssignment(id);
+      return;
+    }
+
     // Check if employee is already in our list
     const employeeInList = employees.find((emp) => emp._id === id);
 
@@ -182,49 +191,51 @@ const TalentPoolPage = () => {
     }
   };
 
+  // Handle employee assignment to a role
+  const handleEmployeeAssignment = async (employeeId) => {
+    if (!isSelectingForProject || !projectAssignmentData) return;
+
+    setAssignmentLoading(true);
+    setAssignmentError(null);
+    setAssignmentSuccess(false);
+
+    try {
+      const response = await projectService.addEmployeeToRole(
+        projectAssignmentData.projectId,
+        employeeId,
+        projectAssignmentData.roleId.toString(),
+        projectAssignmentData.roleName
+      );
+
+      if (response.success) {
+        setAssignmentSuccess(true);
+        // Show success message briefly before navigating
+        setTimeout(() => {
+          navigate(`/kpi-management/${projectAssignmentData.projectId}`, {
+            state: { activeTab: "team", assignmentSuccess: true },
+          });
+        }, 1500);
+      } else {
+        setAssignmentError(response.message || "Failed to assign employee");
+      }
+    } catch (error) {
+      console.error("Error assigning employee:", error);
+      setAssignmentError("An error occurred while assigning the employee");
+    } finally {
+      setAssignmentLoading(false);
+    }
+  };
+
   // Handle employee selection in project mode
   const handleEmployeeToggle = (employee) => {
-    setSelectedEmployees(prev => {
+    setSelectedEmployees((prev) => {
       // Toggle selection
-      if (prev.some(e => e._id === employee._id)) {
-        return prev.filter(e => e._id !== employee._id);
+      if (prev.some((e) => e._id === employee._id)) {
+        return prev.filter((e) => e._id !== employee._id);
       } else {
         return [...prev, employee];
       }
     });
-  };
-
-  // Assign selected employees to the project
-  const assignEmployeesToProject = async () => {
-    if (!projectContext || selectedEmployees.length === 0) return;
-    
-    setAssignmentLoading(true);
-    setError("");
-    
-    try {
-      const employeeIds = selectedEmployees.map(emp => emp._id);
-      
-      const response = await projectService.updateProject(projectContext.projectId, {
-        team: {
-          employee_ids: employeeIds,
-          role: projectContext.roleName,
-          role_id: projectContext.roleId,
-          updated_at: new Date().toISOString()
-        }
-      });
-      
-      if (response.success) {
-        // Navigate back to the KPI management page
-        navigate(`/kpi-management/${projectContext.projectId}`);
-      } else {
-        setError(response.message || "Failed to assign team members");
-      }
-    } catch (error) {
-      console.error("Error assigning team members:", error);
-      setError("An error occurred while assigning team members");
-    } finally {
-      setAssignmentLoading(false);
-    }
   };
 
   // Handle filter changes from EmployeeFilter component
@@ -239,11 +250,13 @@ const TalentPoolPage = () => {
 
   // Navigate back to KPI management without making changes
   const cancelProjectSelection = () => {
-    if (projectContext?.projectId) {
-      navigate(`/kpi-management/${projectContext.projectId}`);
+    if (projectAssignmentData?.projectId) {
+      navigate(`/kpi-management/${projectAssignmentData.projectId}`, {
+        state: { activeTab: "team" },
+      });
     } else {
       setIsSelectingForProject(false);
-      setProjectContext(null);
+      setProjectAssignmentData(null);
       setSelectedEmployees([]);
     }
   };
@@ -255,7 +268,9 @@ const TalentPoolPage = () => {
           <h1 className="text-2xl font-bold text-gray-900">Talent Pool</h1>
           <p className="text-gray-600">
             {isSelectingForProject
-              ? `Select employees for ${projectContext?.roleName || "project role"}`
+              ? `Select employee for ${
+                  projectAssignmentData?.roleName || "project role"
+                }`
               : employeeId
               ? "View and analyze employee details"
               : "Browse and analyze employee profiles"}
@@ -365,39 +380,53 @@ const TalentPoolPage = () => {
         </div>
       </div>
 
+      {/* Assignment status notifications */}
+      {assignmentLoading && (
+        <div className="p-4 mb-4 border border-blue-200 rounded-md bg-blue-50">
+          <Loading text="Assigning employee to role..." />
+        </div>
+      )}
+
+      {assignmentError && (
+        <div className="p-4 mb-4 border border-red-200 rounded-md bg-red-50">
+          <p className="text-red-700">{assignmentError}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            onClick={() => setAssignmentError(null)}
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
+
+      {assignmentSuccess && (
+        <div className="p-4 mb-4 border border-green-200 rounded-md bg-green-50">
+          <p className="text-green-700">
+            Employee successfully assigned to role! Redirecting...
+          </p>
+        </div>
+      )}
+
       {/* Selection mode header */}
-      {isSelectingForProject && (
+      {isSelectingForProject && !assignmentSuccess && (
         <div className="p-4 mb-6 rounded-lg bg-blue-50">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-medium text-gray-800">
-                Selecting employees for: <span className="text-blue-700">{projectContext?.roleName || "Role"}</span>
+                Selecting employee for:{" "}
+                <span className="text-blue-700">
+                  {projectAssignmentData?.roleName || "Role"}
+                </span>
               </h3>
-              <p className="text-sm text-gray-600">
-                Selected {selectedEmployees.length} employee(s)
+              <p className="text-sm text-blue-600">
+                Click on an employee to assign them to this role
               </p>
             </div>
-            <div className="flex space-x-3">
-              <Button 
-                variant="outline" 
-                onClick={cancelProjectSelection}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="primary" 
-                onClick={assignEmployeesToProject}
-                disabled={selectedEmployees.length === 0 || assignmentLoading}
-                icon={assignmentLoading ? (
-                  <svg className="w-4 h-4 mr-2 -ml-1 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : null}
-              >
-                {assignmentLoading ? "Assigning..." : "Assign to Project"}
-              </Button>
-            </div>
+            <Button variant="outline" onClick={cancelProjectSelection}>
+              Cancel
+            </Button>
           </div>
         </div>
       )}
@@ -624,7 +653,7 @@ const TalentPoolPage = () => {
                   </div>
                   <EmployeeList
                     employees={employees}
-                    onSelectEmployee={(id) => navigate(`/talent-pool/${id}`)}
+                    onSelectEmployee={handleSelectEmployee}
                     selectionMode={isSelectingForProject}
                     selectedEmployees={selectedEmployees}
                     onEmployeeToggle={handleEmployeeToggle}
@@ -655,21 +684,21 @@ const TalentPoolPage = () => {
                         />
                       </svg>
                       <h2 className="mb-2 text-lg font-medium text-gray-700">
-                        Employee Selection Mode
+                        Select Employee for Role
                       </h2>
                       <p className="mb-6 text-gray-500">
-                        Select employees from the list on the left to assign to{" "}
-                        <strong>{projectContext?.roleName || "project role"}</strong>
+                        Click on an employee from the list on the left to assign
+                        to{" "}
+                        <strong>
+                          {projectAssignmentData?.roleName || "project role"}
+                        </strong>
                       </p>
-                      <div className="flex justify-center space-x-4">
+                      <div className="flex justify-center">
                         <Button
-                          variant={selectedEmployees.length === 0 ? "outline" : "primary"}
-                          onClick={assignEmployeesToProject}
-                          disabled={selectedEmployees.length === 0 || assignmentLoading}
+                          variant="outline"
+                          onClick={cancelProjectSelection}
                         >
-                          {selectedEmployees.length === 0 
-                            ? "No Employees Selected" 
-                            : `Assign ${selectedEmployees.length} Employees`}
+                          Cancel Selection
                         </Button>
                       </div>
                     </>
@@ -693,8 +722,8 @@ const TalentPoolPage = () => {
                         Talent Pool
                       </h2>
                       <p className="mb-6 text-gray-500">
-                        Select an employee from the list to view their details or
-                        upload a new CV to add to the talent pool.
+                        Select an employee from the list to view their details
+                        or upload a new CV to add to the talent pool.
                       </p>
                       <div className="flex justify-center space-x-4">
                         <Button
@@ -813,26 +842,25 @@ const TalentPoolPage = () => {
                       </div>
                     )}
                     {selectedEmployee.data["Contact Information"]?.LinkedIn && (
-                        <div>
-                          <span className="text-sm font-medium text-gray-700">
-                            LinkedIn:
-                          </span>
-                          <p className="text-gray-800">
-                            
-                              href={
-                                selectedEmployee.data["Contact Information"]
-                                  .LinkedIn
-                              }
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline"
-                              {
-                                selectedEmployee.data["Contact Information"]
-                                  .LinkedIn
-                              }
-                          </p>
-                        </div>
-                      )}
+                      <div>
+                        <span className="text-sm font-medium text-gray-700">
+                          LinkedIn:
+                        </span>
+                        <p className="text-gray-800">
+                          href=
+                          {
+                            selectedEmployee.data["Contact Information"]
+                              .LinkedIn
+                          }
+                          target="_blank" rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                          {
+                            selectedEmployee.data["Contact Information"]
+                              .LinkedIn
+                          }
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </Card>
 

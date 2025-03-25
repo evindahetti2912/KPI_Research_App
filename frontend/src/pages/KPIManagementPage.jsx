@@ -13,10 +13,13 @@ import Loading from "../components/common/Loading";
 import Modal from "../components/common/Modal";
 import { projectService } from "../services/projectService";
 import { kpiService } from "../services/kpiService";
+import { useLocation } from "react-router-dom";
+import EmployeeAssignmentCard from "../components/talent-pool/EmployeeAssignmentCard";
 
 const KPIManagementPage = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [project, setProject] = useState(null);
   const [kpis, setKPIs] = useState(null);
@@ -26,7 +29,9 @@ const KPIManagementPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showAdjustModal, setShowAdjustModal] = useState(false);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(
+    location.state?.activeTab || "dashboard"
+  );
   const [chartPaths, setChartPaths] = useState({});
   const [kpiRecommendations, setKpiRecommendations] = useState([]);
 
@@ -82,6 +87,13 @@ const KPIManagementPage = () => {
     }
   };
 
+  // Add in useEffect to handle location state changes
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
+
   // In the fetchKPIRecommendations function
   const fetchKPIRecommendations = async () => {
     try {
@@ -109,6 +121,45 @@ const KPIManagementPage = () => {
 
     // Save KPIs to project
     saveKPIsToProject(data);
+  };
+
+  const handleRemoveAssignment = async (roleId) => {
+    if (!projectId || !project) return;
+
+    try {
+      setIsLoading(true);
+      setError("");
+
+      // Get current team data
+      const teamData = project.team || {};
+      const roleAssignments = teamData.role_assignments || [];
+
+      // Filter out the assignment we want to remove
+      const updatedAssignments = roleAssignments.filter(
+        (assignment) => assignment.roleId !== roleId.toString()
+      );
+
+      // Update the project with the new role assignments
+      const response = await projectService.updateProject(projectId, {
+        team: {
+          ...teamData,
+          role_assignments: updatedAssignments,
+          updated_at: new Date().toISOString(),
+        },
+      });
+
+      if (response.success) {
+        // Refresh project data to see the changes
+        fetchProjectData();
+      } else {
+        setError(response.message || "Failed to remove team member");
+      }
+    } catch (error) {
+      console.error("Error removing team member:", error);
+      setError("An error occurred while removing the team member");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const saveKPIsToProject = async (kpiData) => {
@@ -229,49 +280,101 @@ const KPIManagementPage = () => {
               </p>
 
               <div className="space-y-4">
-                {employeeCriteria.map((criteria, index) => (
-                  <div key={index} className="p-4 border rounded-md">
-                    <h3 className="mb-2 font-medium text-gray-800">
-                      {criteria.role}
-                    </h3>
+                {employeeCriteria.map((criteria, index) => {
+                  // Find assigned employee for this role
+                  const assignedEmployee =
+                    project?.team?.role_assignments?.find(
+                      (assignment) => assignment.roleId === index.toString()
+                    );
 
-                    <div className="mt-2">
-                      <h4 className="mb-1 text-sm font-medium text-gray-700">
-                        Required Skills:
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {criteria.skills.map((skill, skillIndex) => (
-                          <span
-                            key={skillIndex}
-                            className="px-2 py-1 text-xs text-blue-800 bg-blue-100 rounded"
-                          >
-                            {skill}
+                  return (
+                    <div key={index} className="p-4 border rounded-md">
+                      <h3 className="mb-2 font-medium text-gray-800">
+                        {criteria.role}
+                        {assignedEmployee && (
+                          <span className="ml-2 px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded">
+                            Assigned
                           </span>
-                        ))}
+                        )}
+                      </h3>
+
+                      <div className="mt-2">
+                        <h4 className="mb-1 text-sm font-medium text-gray-700">
+                          Required Skills:
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {criteria.skills.map((skill, skillIndex) => (
+                            <span
+                              key={skillIndex}
+                              className="px-2 py-1 text-xs text-blue-800 bg-blue-100 rounded"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Show assigned employee if available */}
+                      {assignedEmployee && (
+                        <div className="p-2 mt-3 rounded bg-gray-50">
+                          <h4 className="text-sm font-medium text-gray-700">
+                            Assigned Employee:
+                          </h4>
+                          <div className="mt-1">
+                            {/* You need to fetch employee details or display ID until fetched */}
+                            <EmployeeAssignmentCard
+                              employeeId={assignedEmployee.employeeId}
+                              projectId={projectId}
+                              roleId={index}
+                              onRemove={() => handleRemoveAssignment(index)}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end mt-4">
+                        {!assignedEmployee ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              navigate("/talent-pool", {
+                                state: {
+                                  skillFilter: criteria.skills.join(", "),
+                                  projectId: projectId,
+                                  roleId: index,
+                                  roleName: criteria.role,
+                                  isSelectingForProject: true,
+                                },
+                              })
+                            }
+                          >
+                            Find Matching Employees
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              navigate("/talent-pool", {
+                                state: {
+                                  skillFilter: criteria.skills.join(", "),
+                                  projectId: projectId,
+                                  roleId: index,
+                                  roleName: criteria.role,
+                                  isSelectingForProject: true,
+                                  replaceExisting: true,
+                                },
+                              })
+                            }
+                          >
+                            Replace Employee
+                          </Button>
+                        )}
                       </div>
                     </div>
-
-                    <div className="flex justify-end mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          navigate("/talent-pool", {
-                            state: {
-                              skillFilter: criteria.skills.join(", "),
-                              projectId: projectId,
-                              roleId: index,
-                              roleName: criteria.role,
-                              isSelectingForProject: true,
-                            },
-                          })
-                        }
-                      >
-                        Find Matching Employees
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </Card>

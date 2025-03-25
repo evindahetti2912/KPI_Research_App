@@ -337,3 +337,81 @@ def match_employees_to_project(project_id):
             'success': False,
             'message': f"Error matching employees to project: {str(e)}"
         }), 500
+
+
+@project_blueprint.route('/<project_id>/team/add-employee', methods=['POST'])
+def add_employee_to_team(project_id):
+    """
+    Endpoint for adding an employee to a specific team role.
+    """
+    try:
+        data = request.json
+        if not data or 'employeeId' not in data or 'roleId' not in data:
+            raise ValidationError("Missing required employee or role data")
+
+        employee_id = data['employeeId']
+        role_id = data['roleId']
+        role_name = data.get('roleName', 'Unknown Role')
+
+        # Convert string ID to ObjectId
+        object_id = ObjectId(project_id)
+
+        # Check if project exists
+        project = mongodb_service.find_one('Projects', {'_id': object_id})
+        if not project:
+            raise NotFoundError(f"Project with ID {project_id} not found")
+
+        # Initialize team data structure if needed
+        if 'team' not in project:
+            project['team'] = {
+                'employee_ids': [],
+                'role_assignments': [],
+                'updated_at': datetime.now()
+            }
+        elif 'role_assignments' not in project['team']:
+            project['team']['role_assignments'] = []
+
+        # Check if employee already assigned to this role
+        existing = next((item for item in project['team'].get('role_assignments', [])
+                         if item.get('roleId') == role_id), None)
+
+        if existing:
+            # Update existing role assignment
+            existing['employeeId'] = employee_id
+            existing['updated_at'] = datetime.now()
+        else:
+            # Add new role assignment
+            project['team']['role_assignments'].append({
+                'roleId': role_id,
+                'roleName': role_name,
+                'employeeId': employee_id,
+                'updated_at': datetime.now()
+            })
+
+        # Make sure employee_id is in the overall team list
+        if 'employee_ids' not in project['team']:
+            project['team']['employee_ids'] = []
+
+        if employee_id not in project['team']['employee_ids']:
+            project['team']['employee_ids'].append(employee_id)
+
+        project['team']['updated_at'] = datetime.now()
+
+        # Update the project in MongoDB
+        mongodb_service.update_one(
+            'Projects',
+            {'_id': object_id},
+            {'$set': {'team': project['team']}}
+        )
+
+        return jsonify({
+            'success': True,
+            'message': f"Employee assigned to role successfully",
+            'role_assignments': project['team']['role_assignments']
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f"Error assigning employee to role: {str(e)}"
+        }), 500

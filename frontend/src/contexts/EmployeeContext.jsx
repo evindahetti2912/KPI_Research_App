@@ -83,12 +83,40 @@ export const EmployeeProvider = ({ children }) => {
         filtered = filtered.filter((emp) => {
           if (!emp.Skills || !emp.Skills.length) return false;
 
-          return skillsArray.some((skill) =>
+          // Changed from .some to .filter to count matching skills
+          const matchingSkills = skillsArray.filter((skill) =>
             emp.Skills.some((empSkill) =>
               empSkill.toLowerCase().includes(skill)
             )
           );
+
+          // Show employee if they have at least one of the required skills
+          return matchingSkills.length > 0;
         });
+
+        // Add compatibility percentage to each employee
+        filtered = filtered.map((emp) => {
+          if (!emp.Skills || !emp.Skills.length) {
+            emp._compatibility = 0;
+            return emp;
+          }
+
+          const matchingSkills = skillsArray.filter((skill) =>
+            emp.Skills.some((empSkill) =>
+              empSkill.toLowerCase().includes(skill)
+            )
+          );
+
+          emp._compatibility = Math.round(
+            (matchingSkills.length / skillsArray.length) * 100
+          );
+          return emp;
+        });
+
+        // Sort by compatibility percentage (highest first)
+        filtered.sort(
+          (a, b) => (b._compatibility || 0) - (a._compatibility || 0)
+        );
       }
     }
 
