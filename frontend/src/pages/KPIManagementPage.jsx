@@ -15,6 +15,7 @@ import { projectService } from "../services/projectService";
 import { kpiService } from "../services/kpiService";
 import { useLocation } from "react-router-dom";
 import EmployeeAssignmentCard from "../components/talent-pool/EmployeeAssignmentCard";
+import TeamKPIDashboard from "../components/kpi-management/TeamKPIDashboard";
 
 const KPIManagementPage = () => {
   const { projectId } = useParams();
@@ -244,6 +245,11 @@ const KPIManagementPage = () => {
             chartData={ganttData}
             projectTimeline={project?.project_timeline || 90}
           />
+        );
+
+      case "teamkpis":
+        return (
+        <TeamKPIDashboard projectId={projectId} projectKPIs={kpis} />
         );
 
       case "burndown":
@@ -697,6 +703,16 @@ const KPIManagementPage = () => {
                       onClick={() => setActiveTab("team")}
                     >
                       Team Criteria
+                    </button>
+                    <button
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
+                        activeTab === "teamkpis"
+                          ? "text-blue-600 border-b-2 border-blue-600"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                      onClick={() => setActiveTab("teamkpis")}
+                    >
+                      Team KPIs
                     </button>
                     <button
                       className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${

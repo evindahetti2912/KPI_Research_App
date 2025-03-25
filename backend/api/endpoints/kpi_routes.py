@@ -433,3 +433,77 @@ def get_project_kpi_recommendations(project_id):
             'success': False,
             'message': f"Error retrieving project KPI recommendations: {str(e)}"
         }), 500
+
+@kpi_blueprint.route('/projects/<project_id>/employees/<employee_id>/progress', methods=['POST'])
+def update_employee_kpi_progress(project_id, employee_id):
+    """
+    Endpoint for updating employee-specific KPI progress.
+    """
+    try:
+        data = request.json
+
+        if not data:
+            raise ValidationError("No data provided")
+
+        # Convert string IDs to ObjectId
+        project_object_id = ObjectId(project_id)
+        employee_object_id = ObjectId(employee_id)
+
+        # Check if project exists
+        project = mongodb_service.find_one('Projects', {'_id': project_object_id})
+        if not project:
+            raise NotFoundError(f"Project with ID {project_id} not found")
+
+        # Check if employee exists
+        employee = mongodb_service.find_one('Resumes', {'_id': employee_object_id})
+        if not employee:
+            raise NotFoundError(f"Employee with ID {employee_id} not found")
+
+        # Check if project team includes this employee
+        if not 'team' in project or 'employee_ids' not in project['team'] or employee_id not in project['team']['employee_ids']:
+            raise ValidationError(f"Employee {employee_id} is not part of project {project_id}")
+
+        # Get or create employee KPI progress collection entry
+        employee_kpi_progress = mongodb_service.find_one(
+            'EmployeeKPIProgress',
+            {
+                'project_id': project_object_id,
+                'employee_id': employee_object_id
+            }
+        )
+
+        if employee_kpi_progress:
+            # Update existing progress
+            mongodb_service.update_one(
+                'EmployeeKPIProgress',
+                {'_id': employee_kpi_progress['_id']},
+                {
+                    '$set': {
+                        'progress': data,
+                        'updated_at': datetime.now()
+                    }
+                }
+            )
+        else:
+            # Create new progress entry
+            mongodb_service.insert_one(
+                'EmployeeKPIProgress',
+                {
+                    'project_id': project_object_id,
+                    'employee_id': employee_object_id,
+                    'progress': data,
+                    'created_at': datetime.now(),
+                    'updated_at': datetime.now()
+                }
+            )
+
+        return jsonify({
+            'success': True,
+            'message': f"Employee KPI progress updated successfully",
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f"Error updating employee KPI progress: {str(e)}"
+        }), 500
