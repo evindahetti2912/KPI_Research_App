@@ -4,7 +4,7 @@ import Button from "../common/Button";
 import Loading from "../common/Loading";
 import { recommendationService } from "../../services/recommendationService";
 
-const SkillGapAnalyzer = ({ employeeId, employeeData }) => {
+const SkillGapAnalyzer = ({ employeeId, employeeData, onAnalysisComplete }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [analysis, setAnalysis] = useState(null);
@@ -29,6 +29,9 @@ const SkillGapAnalyzer = ({ employeeId, employeeData }) => {
 
       if (response.success) {
         setAnalysis(response.analysis);
+        if (onAnalysisComplete) {
+          onAnalysisComplete(response.analysis);
+        }
       } else {
         setError(response.message || "Failed to analyze skill gap");
       }
@@ -59,8 +62,10 @@ const SkillGapAnalyzer = ({ employeeId, employeeData }) => {
   };
 
   const renderCareerAnalysis = () => {
+    if (!analysis) return null;
+
     const { current_role, next_role, readiness, skill_gaps } = analysis;
-    const readinessPercentage = Math.round(readiness * 100);
+    const readinessPercentage = Math.round((readiness || 0) * 100);
 
     return (
       <div className="space-y-4">
@@ -164,7 +169,30 @@ const SkillGapAnalyzer = ({ employeeId, employeeData }) => {
   };
 
   const renderRoleAnalysis = () => {
-    const { role, technical, soft, overall_coverage, is_qualified } = analysis;
+    if (!analysis || !analysis.role) return null;
+
+    // Destructure with default values to prevent "undefined" errors
+    const {
+      role,
+      technical = {},
+      soft = {},
+      overall_coverage = 0,
+      is_qualified = false,
+    } = analysis;
+
+    // Provide default objects for technical and soft skill data
+    const technicalData = {
+      coverage: technical?.coverage || 0,
+      gaps: technical?.gaps || [],
+      matches: technical?.matches || [],
+    };
+
+    const softData = {
+      coverage: soft?.coverage || 0,
+      gaps: soft?.gaps || [],
+      matches: soft?.matches || [],
+    };
+
     const coveragePercentage = Math.round(overall_coverage * 100);
 
     return (
@@ -220,23 +248,23 @@ const SkillGapAnalyzer = ({ employeeId, employeeData }) => {
             <div className="mb-2">
               <div className="flex justify-between mb-1 text-xs text-gray-500">
                 <span>Coverage</span>
-                <span>{Math.round(technical.coverage * 100)}%</span>
+                <span>{Math.round(technicalData.coverage * 100)}%</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full">
                 <div
                   className="h-full bg-blue-500 rounded-full"
-                  style={{ width: `${technical.coverage * 100}%` }}
+                  style={{ width: `${technicalData.coverage * 100}%` }}
                 ></div>
               </div>
             </div>
 
-            {technical.gaps.length > 0 && (
+            {technicalData.gaps.length > 0 && (
               <div>
                 <h4 className="mb-2 text-sm font-medium text-gray-700">
                   Missing Skills
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {technical.gaps.map((skill, index) => (
+                  {technicalData.gaps.map((skill, index) => (
                     <span
                       key={index}
                       className="bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded"
@@ -248,13 +276,13 @@ const SkillGapAnalyzer = ({ employeeId, employeeData }) => {
               </div>
             )}
 
-            {technical.matches.length > 0 && (
+            {technicalData.matches.length > 0 && (
               <div className="mt-3">
                 <h4 className="mb-2 text-sm font-medium text-gray-700">
                   Matching Skills
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {technical.matches.map((skill, index) => (
+                  {technicalData.matches.map((skill, index) => (
                     <span
                       key={index}
                       className="bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded"
@@ -273,23 +301,23 @@ const SkillGapAnalyzer = ({ employeeId, employeeData }) => {
             <div className="mb-2">
               <div className="flex justify-between mb-1 text-xs text-gray-500">
                 <span>Coverage</span>
-                <span>{Math.round(soft.coverage * 100)}%</span>
+                <span>{Math.round(softData.coverage * 100)}%</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full">
                 <div
                   className="h-full bg-purple-500 rounded-full"
-                  style={{ width: `${soft.coverage * 100}%` }}
+                  style={{ width: `${softData.coverage * 100}%` }}
                 ></div>
               </div>
             </div>
 
-            {soft.gaps.length > 0 && (
+            {softData.gaps.length > 0 && (
               <div>
                 <h4 className="mb-2 text-sm font-medium text-gray-700">
                   Missing Skills
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {soft.gaps.map((skill, index) => (
+                  {softData.gaps.map((skill, index) => (
                     <span
                       key={index}
                       className="bg-red-100 text-red-800 text-xs px-2.5 py-1 rounded"
@@ -301,13 +329,13 @@ const SkillGapAnalyzer = ({ employeeId, employeeData }) => {
               </div>
             )}
 
-            {soft.matches.length > 0 && (
+            {softData.matches.length > 0 && (
               <div className="mt-3">
                 <h4 className="mb-2 text-sm font-medium text-gray-700">
                   Matching Skills
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {soft.matches.map((skill, index) => (
+                  {softData.matches.map((skill, index) => (
                     <span
                       key={index}
                       className="bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded"
