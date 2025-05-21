@@ -182,30 +182,35 @@ const RecommendationList = ({ employeeId, employeeData, analysis }) => {
     );
   };
 
-  const renderSkillGapRecommendations = () => {
-    if (!recommendations || Object.keys(recommendations).length === 0) {
-      return (
-        <p className="text-gray-500">
-          No recommendations available for identified skill gaps.
-        </p>
-      );
-    }
-
+const renderSkillGapRecommendations = () => {
+  if (!recommendations || Object.keys(recommendations).length === 0) {
     return (
-      <div className="space-y-6">
-        {Object.entries(recommendations).map(([skill, resources]) => (
-          <div key={skill} className="space-y-3">
-            <h3 className="font-medium text-gray-800 text-md">{skill}</h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {resources.map((resource, idx) => (
-                <div key={idx}>{renderResourceItem(resource)}</div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      <p className="text-gray-500">
+        No recommendations available for identified skill gaps.
+      </p>
     );
-  };
+  }
+
+
+return (
+    <div className="space-y-6">
+      {Object.entries(recommendations).map(([skill, resources]) => (
+        <div key={skill} className="space-y-3">
+          <h3 className="font-medium text-gray-800 text-md">{skill}</h3>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {Array.isArray(resources) ? (
+              resources.map((resource, idx) => (
+                <div key={idx}>{renderResourceItem(resource)}</div>
+              ))
+            ) : (
+              <p className="text-gray-500">No resources available for this skill.</p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
   const renderRecommendations = () => {
     if (!recommendations) return null;

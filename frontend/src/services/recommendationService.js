@@ -9,21 +9,34 @@ export const recommendationService = {
      * @param {Object} data - Additional data for the analysis
      * @returns {Promise<Object>} - The API response
      */
-    analyzeSkillGap: async (employeeId, analysisType, data = {}) => {
-        try {
-            const response = await api.post(`/recommendations/employees/${employeeId}/skill-gap`, {
-                analysis_type: analysisType,
-                ...data
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Error analyzing skill gap:', error);
-            return {
-                success: false,
-                message: error.response?.data?.message || 'Failed to analyze skill gap'
-            };
-        }
-    },
+analyzeSkillGap: async (employeeId, analysisType, data = {}) => {
+    try {
+        // Log what we're sending to help with debugging
+        console.log(`Analyzing skill gap for employee ${employeeId}:`, { 
+            analysis_type: analysisType, 
+            ...data 
+        });
+        
+        const response = await api.post(`/recommendations/employees/${employeeId}/skill-gap`, {
+            analysis_type: analysisType,
+            ...data
+        });
+        
+        return response.data;
+    } catch (error) {
+        console.error('Error analyzing skill gap:', error);
+        
+        // Extract the error message from the response if available
+        const errorMessage = error.response?.data?.message 
+            || error.message 
+            || 'Failed to analyze skill gap';
+            
+        return {
+            success: false,
+            message: errorMessage
+        };
+    }
+},
 
     /**
      * Get training recommendations for an employee

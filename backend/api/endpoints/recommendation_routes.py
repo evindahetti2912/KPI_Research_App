@@ -15,6 +15,23 @@ from utils.error_handlers import ValidationError, NotFoundError
 recommendation_blueprint = Blueprint('recommendations', __name__)
 
 
+from flask import Blueprint, request, jsonify
+from bson.objectid import ObjectId
+import json
+from datetime import datetime
+
+from services.mongodb_service import mongodb_service
+from services.openai_service import openai_service
+from modules.skill_recommendation.skill_gap_analyzer import SkillGapAnalyzer
+from modules.skill_recommendation.role_hierarchy import RoleHierarchy
+from modules.skill_recommendation.training_recommender import TrainingRecommender
+from modules.skill_recommendation.progress_tracker import ProgressTracker
+from modules.employee_matching.experience_analyzer import ExperienceAnalyzer
+from utils.error_handlers import ValidationError, NotFoundError
+
+recommendation_blueprint = Blueprint('recommendations', __name__)
+
+
 @recommendation_blueprint.route('/employees/<employee_id>/skill-gap', methods=['POST'])
 def analyze_employee_skill_gap(employee_id):
     """
@@ -46,7 +63,10 @@ def analyze_employee_skill_gap(employee_id):
             role_name = data.get('role_name')
 
             if not role_name:
-                raise ValidationError("Role name is required for role-based analysis")
+                return jsonify({
+                    'success': False,
+                    'message': "Role name is required for role-based analysis"
+                }), 400
 
             # Analyze skill gap for the role
             analysis = SkillGapAnalyzer.analyze_role_skill_gap(employee_skills, role_name)
@@ -56,7 +76,10 @@ def analyze_employee_skill_gap(employee_id):
             project_skills = data.get('project_skills', [])
 
             if not project_skills:
-                raise ValidationError("Project skills are required for project-based analysis")
+                return jsonify({
+                    'success': False,
+                    'message': "Project skills are required for project-based analysis"
+                }), 400
 
             # Analyze skill gap for the project
             analysis = SkillGapAnalyzer.analyze_project_skill_gap(employee_skills, project_skills)
@@ -83,7 +106,10 @@ def analyze_employee_skill_gap(employee_id):
             )
 
         else:
-            raise ValidationError(f"Invalid analysis type: {analysis_type}")
+            return jsonify({
+                'success': False,
+                'message': f"Invalid analysis type: {analysis_type}"
+            }), 400
 
         return jsonify({
             'success': True,
@@ -92,10 +118,22 @@ def analyze_employee_skill_gap(employee_id):
             'analysis': analysis
         })
 
+    except NotFoundError as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 404
+    except ValidationError as e:
+        # Fix the recursion error by converting the exception to a string directly
+        # instead of relying on str(e) which might cause recursion
+        return jsonify({
+            'success': False,
+            'message': "Validation error: " + (e.args[0] if e.args else "Unknown validation error")
+        }), 400
     except Exception as e:
         return jsonify({
             'success': False,
-            'message': f"Error analyzing skill gap: {str(e)}"
+            'message': f"Error analyzing skill gap: {type(e).__name__}: {str(e) if hasattr(e, '__str__') else repr(e)}"
         }), 500
 
 

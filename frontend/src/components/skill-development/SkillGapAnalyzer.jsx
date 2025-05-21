@@ -10,38 +10,47 @@ const SkillGapAnalyzer = ({ employeeId, employeeData, onAnalysisComplete }) => {
   const [analysis, setAnalysis] = useState(null);
   const [analysisType, setAnalysisType] = useState("career");
 
-  const handleAnalyzeSkillGap = async () => {
-    if (!employeeId) return;
+const handleAnalyzeSkillGap = async () => {
+  if (!employeeId) return;
 
-    setIsLoading(true);
-    setError("");
+  setIsLoading(true);
+  setError("");
 
-    try {
-      const currentRole = employeeData?.Experience?.[0]?.Role || "";
-
-      const response = await recommendationService.analyzeSkillGap(
-        employeeId,
-        analysisType,
-        {
-          current_role: currentRole,
-        }
-      );
-
-      if (response.success) {
-        setAnalysis(response.analysis);
-        if (onAnalysisComplete) {
-          onAnalysisComplete(response.analysis);
-        }
-      } else {
-        setError(response.message || "Failed to analyze skill gap");
-      }
-    } catch (error) {
-      console.error("Error analyzing skill gap:", error);
-      setError("An error occurred while analyzing skill gap");
-    } finally {
-      setIsLoading(false);
+  try {
+    const currentRole = employeeData?.Experience?.[0]?.Role || "";
+    
+    // Make sure we provide role_name for role-based analysis
+    const requestData = {
+      analysis_type: analysisType,
+      current_role: currentRole
+    };
+    
+    // For role analysis, ensure we have a default role if none provided
+    if (analysisType === "role") {
+      requestData.role_name = "Software Engineer"; // Default role if none selected
     }
-  };
+
+    const response = await recommendationService.analyzeSkillGap(
+      employeeId,
+      analysisType,
+      requestData
+    );
+
+    if (response.success) {
+      setAnalysis(response.analysis);
+      if (onAnalysisComplete) {
+        onAnalysisComplete(response.analysis);
+      }
+    } else {
+      setError(response.message || "Failed to analyze skill gap");
+    }
+  } catch (error) {
+    console.error("Error analyzing skill gap:", error);
+    setError("An error occurred while analyzing skill gap");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   useEffect(() => {
     if (employeeId) {
